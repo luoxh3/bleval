@@ -27,9 +27,3 @@ The log likelihood for unit i.
 \description{
 Log Likelihood for Unit i
 }
-\examples{
-\donttest{
-log_lik_i(...)  # need another file
-}
-
-}

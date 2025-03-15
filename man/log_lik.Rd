@@ -43,9 +43,3 @@ A list containing two elements:
 \description{
 Computes ...
 }
-\examples{
-\donttest{
-log_lik(...)  # need another file
-}
-
-}

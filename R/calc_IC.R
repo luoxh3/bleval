@@ -32,11 +32,6 @@
 #'
 #' @export
 #'
-#' @examples
-#' \donttest{
-#' calc_IC(...)  # need another file
-#' }
-#'
 calc_IC <- function(log_lik_result, p_dic_version) {
 
   # Sum of log-likelihood values for each replicate

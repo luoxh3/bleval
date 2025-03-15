@@ -16,11 +16,6 @@
 #'
 #' @export
 #'
-#' @examples
-#' \donttest{
-#' log_lik_i(...)  # need another file
-#' }
-#'
 log_lik_i <- function(samples_s, data, i, Ngrid, lv_mu, lv_cov, log_joint_i) {
 
   # Extract the posterior mean and covariance matrix for the latent variable for unit i
@@ -31,8 +26,8 @@ log_lik_i <- function(samples_s, data, i, Ngrid, lv_mu, lv_cov, log_joint_i) {
   Ndim <- length(lv_mu_i)
 
   # Compute quadrature nodes and log weights for numerical integration
-  nodes_Ndim <- blvmeval::get_quadrature(Ngrid, Ndim)$nodes
-  log_weights_Ndim <- blvmeval::get_quadrature(Ngrid, Ndim)$log_weights
+  nodes_Ndim <- bleval::get_quadrature(Ngrid, Ndim)$nodes
+  log_weights_Ndim <- bleval::get_quadrature(Ngrid, Ndim)$log_weights
 
   # Handle the case when Ndim = 1 (univariate latent variable)
   if (Ndim == 1) {

@@ -38,11 +38,6 @@
 #'
 #' @export
 #'
-#' @examples
-#' \donttest{
-#' log_marg_lik(...)  # need another file
-#' }
-#'
 log_marg_lik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
                          log_prior, lb, ub, ...) {
 
@@ -55,8 +50,8 @@ log_marg_lik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
     for (i in 1:N) {
       # Compute log likelihood for each individual
       # passing lv_mu, lv_cov and Ngrid explicitly
-      loglik_i_all[i] <- blvmeval::log_lik_i(samples_s, data, i, Ngrid,
-                                             lv_mu, lv_cov, log_joint_i)
+      loglik_i_all[i] <- bleval::log_lik_i(samples_s, data, i, Ngrid,
+                                           lv_mu, lv_cov, log_joint_i)
     }
     # Return the sum of the log likelihoods and the log prior
     sum(loglik_i_all) + log_prior(samples_s)
@@ -71,3 +66,4 @@ log_marg_lik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
   return(bridge_result)
 
 }
+

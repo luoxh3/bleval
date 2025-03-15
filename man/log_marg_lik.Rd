@@ -58,9 +58,3 @@ The function takes posterior samples of the model parameters, a log-likelihood f
 and a log-prior function, and then uses the \code{bridge_sampler} function from the \code{bridgesampling}
 package to estimate the log marginal likelihood.
 }
-\examples{
-\donttest{
-log_marg_lik(...)  # need another file
-}
-
-}

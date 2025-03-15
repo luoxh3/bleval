@@ -1,0 +1,324 @@
+---
+title: "Bayesian Evaluation of a Latent Moderation Structural Equation Model Using the bleval Package"
+author: "Xiaohui Luo"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This document demonstrates the evaluation of a Bayesian latent moderation structural equation model (LMSEM) using the `bleval` package. The model includes latent variables for predictors (X), moderators (M), and outcomes (Y), with an interaction term between X and M. We illustrate the workflow from data preparation to model evaluation, including parameter estimation in JAGS, convergence diagnostics, and computation of information criteria (DIC, WAIC, LOOIC) and marginal likelihood using the `bleval` package.
+
+## Read Data
+
+We begin by loading the `bleval` package and the dataset `example1_LMSEM`, which contains the observed variables for the latent moderation structural equation model.
+
+```{r}
+# Install the bleval package from a local `.tar.gz` file
+# unloadNamespace("bleval")
+# remove.packages("bleval", lib = "D:/Software/R/R-4.2.2/library")
+install.packages("D:/2_PhD/C_project/P15_marginal likelihood_tutorial/bleval/bleval_0.0.0.9000.tar.gz",
+                 repos = NULL, lib = "D:/Software/R/R-4.2.2/library")
+# Load the package
+library(bleval, lib.loc = "D:/Software/R/R-4.2.2/library") 
+
+# Load the dataset from the bleval package
+data(example1_LMSEM, package = "bleval")
+
+# Standardize all observed variables
+example1_LMSEM <- scale(example1_LMSEM)
+```
+
+## Parameter Estimation in JAGS
+
+We define the Bayesian latent moderation structural equation model in JAGS and estimate parameters using MCMC sampling.
+
+```{r}
+library(rjags)
+
+model_string <- "
+  model {
+    # Measurement Models --------------------
+    for (i in 1:N) {
+      for (j in 1:NumX) {
+        X[i, j] ~ dnorm(mu_X[i, j], tau_X[j])
+        mu_X[i, j] <- lambdaX[j] * eta_X[i]
+      }
+      for (j in 1:NumM) {
+        M[i, j] ~ dnorm(mu_M[i, j], tau_M[j])
+        mu_M[i, j] <- lambdaM[j] * eta_M[i]
+      }
+      for (j in 1:NumY) {
+        Y[i, j] ~ dnorm(mu_Y[i, j], tau_Y[j])
+        mu_Y[i, j] <- lambdaY[j] * eta_Y[i]
+      }
+    }
+  
+    # Latent Variables ----------------------
+    for (i in 1:N) {
+      eta_X[i] ~ dnorm(0, tau_eta_X)
+      eta_M[i] ~ dnorm(0, tau_eta_M)
+      eta_Y[i] ~ dnorm(mu_eta_Y[i], tau_eta_Y)
+    }
+
+    # Interaction term ----------------------
+    for (i in 1:N) {
+      eta_XM[i] <- eta_X[i] * eta_M[i]
+    }
+  
+    # Structural Model ----------------------
+    for (i in 1:N) {
+      mu_eta_Y[i] <- b1 * eta_X[i] + b2 * eta_M[i] + b3 * eta_XM[i]
+    }
+  
+    # Priors --------------------------------
+    b1 ~ dnorm(0, 0.01)
+    b2 ~ dnorm(0, 0.01)
+    b3 ~ dnorm(0, 0.01)
+  
+    lambdaX[1] <- 1
+    for (j in 2:NumX) {
+      lambdaX[j] ~ dnorm(0, 0.01)
+    }
+    lambdaM[1] <- 1
+    for (j in 2:NumM) {
+      lambdaM[j] ~ dnorm(0, 0.01)
+    }
+    lambdaY[1] <- 1
+    for (j in 2:NumY) {
+      lambdaY[j] ~ dnorm(0, 0.01)
+    }
+  
+    for (j in 1:NumX) {
+      tau_X[j] ~ dgamma(0.001, 0.001)
+    }
+    for (j in 1:NumM) {
+      tau_M[j] ~ dgamma(0.001, 0.001)
+    }
+    for (j in 1:NumY) {
+      tau_Y[j] ~ dgamma(0.001, 0.001)
+    }
+  
+    tau_eta_X ~ dgamma(0.001, 0.001)
+    tau_eta_M ~ dgamma(0.001, 0.001)
+    tau_eta_Y ~ dgamma(0.001, 0.001)
+  }
+"
+
+data_list <- list(
+  X = example1_LMSEM[, 14:18],  # Observed indicators for latent variable X 
+  M = example1_LMSEM[, 10:13],  # Observed indicators for latent variable M
+  Y = example1_LMSEM[, 1:9],    # Observed indicators for latent variable Y
+  N = nrow(example1_LMSEM),     # Sample size (Number of units)
+  NumX = 5,                     # Number of indicators for latent variable X
+  NumM = 4,                     # Number of indicators for latent variable M
+  NumY = 9                      # Number of indicators for latent variable Y
+)
+
+# Initialize the JAGS model
+jags_model <- jags.model(textConnection(model_string), data = data_list, n.chains = 4)
+# Run the MCMC sampler with a burn-in period of 5000 iterations
+update(jags_model, 5000)
+# Draw posterior samples from the model
+post <- coda.samples(jags_model,
+                     c("b1", "b2", "b3", "lambdaX", "lambdaM", "lambdaY",
+                       "tau_X", "tau_M", "tau_Y",
+                       "tau_eta_X", "tau_eta_M", "tau_eta_Y",
+                       "eta_X", "eta_M", "eta_XM", "eta_Y"),
+                     n.iter = 25000, thin = 10)
+
+# Combine posterior samples from all chains into a single matrix
+samps <- do.call(rbind, post)
+dim(samps)
+# Extract posterior samples for model parameters only (excluding latent variables)
+pars_vector <- c("b1", "b2", "b3",
+                 "lambdaX[2]","lambdaX[3]","lambdaX[4]","lambdaX[5]",
+                 "lambdaM[2]","lambdaM[3]","lambdaM[4]",
+                 "lambdaY[2]","lambdaY[3]","lambdaY[4]","lambdaY[5]",
+                 "lambdaY[6]","lambdaY[7]","lambdaY[8]","lambdaY[9]",
+                 "tau_X[1]", "tau_X[2]","tau_X[3]","tau_X[4]","tau_X[5]",
+                 "tau_M[1]","tau_M[2]","tau_M[3]","tau_M[4]",
+                 "tau_Y[1]","tau_Y[2]","tau_Y[3]","tau_Y[4]","tau_Y[5]",
+                 "tau_Y[6]","tau_Y[7]","tau_Y[8]","tau_Y[9]",
+                 "tau_eta_X", "tau_eta_M", "tau_eta_Y")
+samps2 <- as.matrix(samps[ ,pars_vector])
+dim(samps2)
+```
+
+## Model Convergence Check
+
+We check the convergence of the MCMC chains using the Gelman-Rubin diagnostic (R-hat). A common threshold for convergence is R-hat \< 1.1.
+
+```{r}
+# Load the posterior_summary.R script to compute convergence diagnostics
+source("posterior_summary.R")
+# Summarize the posterior samples and compute the Gelman-Rubin diagnostic (R-hat)
+result <- summarize_posterior(post)
+# Exclude the fixed factor loadings and compute the maximum R-hat
+max(subset(result, !(rownames(result) %in% c("lambdaM[1]", "lambdaX[1]", "lambdaY[1]")))$RHAT)
+```
+
+## Model Evaluation with `bleval`
+
+### Compute Information Criteria
+
+**Step 1: Specify the `log_joint_i` function**
+
+The `log_joint_i` function calculates the log joint probability for each unit.
+
+```{r}
+log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
+  
+  # conditional likelihood
+  X_i <- data$X[i,]
+  M_i <- data$M[i,]
+  Y_i <- data$Y[i,]
+  
+  Ndim <- 3
+  
+  log_con_X_i <- matrix(NA, nrow = Ngrid^Ndim, ncol = data$NumX)
+  log_con_M_i <- matrix(NA, nrow = Ngrid^Ndim, ncol = data$NumM)
+  log_con_Y_i <- matrix(NA, nrow = Ngrid^Ndim, ncol = data$NumY)
+  predicted_Y <- matrix(NA, nrow = Ngrid^Ndim, ncol = data$NumY)
+  log_con_i <- numeric(Ngrid^Ndim) # log conditional likelihood for person i
+  
+  X_i_extended <- rep(X_i, times = Ngrid^Ndim)
+  X_i_extended_mat <- matrix(X_i_extended, nrow = Ngrid^Ndim, ncol = data$NumX, byrow = TRUE)
+  M_i_extended <- rep(M_i, times = Ngrid^Ndim)
+  M_i_extended_mat <- matrix(M_i_extended, nrow = Ngrid^Ndim, ncol = data$NumM, byrow = TRUE)
+  Y_i_extended <- rep(Y_i, times = Ngrid^Ndim)
+  Y_i_extended_mat <- matrix(Y_i_extended, nrow = Ngrid^Ndim, ncol = data$NumY, byrow = TRUE)
+  
+  lambdaX <- as.vector(samples_s[grep("^lambdaX\\[\\d+\\]$", names(samples_s))])
+  lambdaX <- c(1, lambdaX)
+  sdX_matrix <- matrix(rep( sqrt(1/samples_s[grep("^tau_X\\[\\d+\\]$", names(samples_s))]), times = Ngrid^Ndim), nrow = Ngrid^Ndim, byrow = TRUE)
+  log_con_X_i <- dnorm(X_i_extended_mat, mean = nodes[,1] %*% t(lambdaX), sd = sdX_matrix, log = TRUE)
+  
+  lambdaM <- as.vector(samples_s[grep("^lambdaM\\[\\d+\\]$", names(samples_s))])
+  lambdaM <- c(1, lambdaM)
+  sdM_matrix <- matrix(rep( sqrt(1/samples_s[grep("^tau_M\\[\\d+\\]$", names(samples_s))]), times = Ngrid^Ndim), nrow = Ngrid^Ndim, byrow = TRUE)
+  log_con_M_i <- dnorm(M_i_extended_mat, mean = nodes[,2] %*% t(lambdaM), sd = sdM_matrix, log = TRUE)
+  
+  lambdaY <- as.vector(samples_s[grep("^lambdaY\\[\\d+\\]$", names(samples_s))])
+  lambdaY <- c(1, lambdaY)
+  sdY_matrix <- matrix(rep( sqrt(1/samples_s[grep("^tau_Y\\[\\d+\\]$", names(samples_s))]), times = Ngrid^Ndim), nrow = Ngrid^Ndim, byrow = TRUE)
+  log_con_Y_i <- dnorm(Y_i_extended_mat, mean = nodes[,3] %*% t(lambdaY), sd = sdY_matrix, log = TRUE)
+  
+  log_con_i <- rowSums(log_con_X_i) + rowSums(log_con_M_i) + rowSums(log_con_Y_i)
+  
+  # random effects
+  log_etaX_i <- numeric(Ngrid^Ndim)
+  log_etaM_i <- numeric(Ngrid^Ndim)
+  log_etaY_i <- numeric(Ngrid^Ndim)
+  
+  predicted_Y <- samples_s[["b1"]]*nodes[,1] + samples_s[["b2"]]*nodes[,2] + samples_s[["b3"]]*nodes[,1]*nodes[,2]
+  log_etaX_i <- dnorm(nodes[,1], mean = 0, sd = sqrt(1/samples_s[["tau_eta_X"]]), log = TRUE)
+  log_etaM_i <- dnorm(nodes[,2], mean = 0, sd = sqrt(1/samples_s[["tau_eta_M"]]), log = TRUE)
+  log_etaY_i <- dnorm(nodes[,3], mean = predicted_Y, sd = sqrt(1/samples_s[["tau_eta_Y"]]), log = TRUE)
+  
+  # return
+  log_con_i + (log_etaX_i + log_etaM_i + log_etaY_i)
+}
+```
+
+**Step 2: Compute the posterior means and covariance matrices of latent variables**
+
+```{r}
+# Create lists to store posterior means and covariance matrices of random effects
+Nnum <- nrow(example1_LMSEM)
+raneff_mu_list <- vector("list", Nnum)
+raneff_cov_list <- vector("list", Nnum)
+
+for (i in 1:Nnum) {
+  # Compute the posterior mean of the random intercept and slope for unit i
+  raneff_mu_list[[i]] <- c(
+    mean(samps[, paste0("eta_X[", i, "]")]),
+    mean(samps[, paste0("eta_M[", i, "]")]),
+    mean(samps[, paste0("eta_Y[", i, "]")])
+  )
+  # Compute the posterior covariance matrix of the random intercept and slope for unit i
+  raneff_cov_list[[i]] <- cov(samps[, c(paste0("eta_X[", i, "]"), 
+                                        paste0("eta_M[", i, "]"), paste0("eta_Y[", i, "]"))])
+}
+```
+
+**Step 3: Compute the log-likelihood integrating out latent variables**
+
+The `log_lik` function from the `bleval` package computes the log likelihood by integrating out the latent variables using adaptive Gauss-Hermite quadrature.
+
+```{r}
+log_lik_result <- bleval::log_lik(samples = samps2, data = data_list, Ngrid = 5,
+                                  lv_mu = raneff_mu_list, lv_cov = raneff_cov_list,
+                                  log_joint_i = log_joint_i, n_cores = 3)
+```
+
+**Step 4: Compute information criteria**
+
+The `calc_IC` function from the `bleval` package computes the information criteria (DIC, WAIC, and LOOIC) based on the log-likelihoods obtained from the `log_lik` function.
+
+```{r}
+bleval::calc_IC(log_lik_result, 1)
+```
+
+### Compute Marginal Likelihood
+
+**Step 1: Specify the `log_prior` function**
+
+The `log_prior` function calculates the log prior probability for model parameters. This function takes a named vector of parameter values from a posterior sample and returns the log prior probability for each parameter.
+
+```{r}
+log_prior <- function(samples_s) {
+
+  log_prob <- 0
+
+  norm_params <- c("b1", "b2", "b3",
+                   paste0("lambdaX[", 2:5, "]"),
+                   paste0("lambdaM[", 2:4, "]"),
+                   paste0("lambdaY[", 2:9, "]"))
+  log_prob <- log_prob + sum(sapply(norm_params, function(param) {
+    dnorm(samples_s[[param]], mean = 0, sd = sqrt(1/0.01), log = TRUE)
+  }))
+
+  gamma_params <- c(paste0("tau_X[", 1:5, "]"),
+                    paste0("tau_M[", 1:4, "]"),
+                    paste0("tau_Y[", 1:9, "]"),
+                    "tau_eta_X", "tau_eta_M", "tau_eta_Y")
+  log_prob <- log_prob + sum(sapply(gamma_params, function(param) {
+    dgamma(samples_s[[param]], shape = 0.001, rate = 0.001, log = TRUE)
+  }))
+
+  # return
+  log_prob
+}
+```
+
+**Step 2: Define parameter bounds**
+
+The `log_marg_lik` function requires lower and upper bounds for the model parameters.
+
+```{r}
+lb <- c(rep(-Inf, 18), rep(0, 21))
+ub <- c(rep( Inf, 18), rep(Inf, 21))
+names(lb) <- pars_vector
+names(ub) <- pars_vector
+```
+
+**Step 3: Compute the log marginal likelihood integrating out both latent variables and model parameters**
+
+The `log_marg_lik` function from the `bleval` package computes the log marginal likelihood by integrating out both the latent variables and the model parameters.
+
+```{r}
+bleval::log_marg_lik(samples = samps2,
+                     data = data_list, Ngrid = 5,
+                     lv_mu = raneff_mu_list, lv_cov = raneff_cov_list,
+                     log_joint_i = log_joint_i, log_prior = log_prior,
+                     lb = lb, ub = ub)
+```
+
+The output of this function is the log marginal likelihood, which can be used to compute Bayes factors for model comparison.

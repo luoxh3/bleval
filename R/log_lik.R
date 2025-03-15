@@ -32,11 +32,6 @@
 #'
 #' @export
 #'
-#' @examples
-#' \donttest{
-#' log_lik(...)  # need another file
-#' }
-#'
 log_lik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
                     parallel = TRUE, n_cores = detectCores() - 2,
                     packages = c("matrixStats", "statmod", "mvtnorm", "extraDistr")) {
@@ -79,8 +74,8 @@ log_lik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
                                         "data", "Ngrid", "lv_mu", "lv_cov",
                                         "log_joint_i")) %dopar% {
                               sapply(1:data$N, function(i) {
-                                blvmeval::log_lik_i(samples[j, ], data, i, Ngrid,
-                                                    lv_mu, lv_cov, log_joint_i)
+                                bleval::log_lik_i(samples[j, ], data, i, Ngrid,
+                                                  lv_mu, lv_cov, log_joint_i)
                               })
                             }
     stopCluster(cl)
@@ -91,8 +86,8 @@ log_lik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
     loglik_point <- matrix(nrow = nrow(samples), ncol = data$N)
     for (j in 1:nrow(samples)) {
       for (i in 1:data$N) {
-        loglik_point[j, i] <- blvmeval::log_lik_i(samples[j, ], data, i, Ngrid,
-                                                  lv_mu, lv_cov, log_joint_i)
+        loglik_point[j, i] <- bleval::log_lik_i(samples[j, ], data, i, Ngrid,
+                                                lv_mu, lv_cov, log_joint_i)
       }
     }
   }
@@ -102,7 +97,7 @@ log_lik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
   samps2_thin_mean <- apply(samples, 2, mean)
   loglik_postmean <- numeric(data$N)
   for (i in 1:data$N) {
-    loglik_postmean[i] <- blvmeval::log_lik_i(samps2_thin_mean, data, i, Ngrid,
+    loglik_postmean[i] <- bleval::log_lik_i(samps2_thin_mean, data, i, Ngrid,
                                               lv_mu, lv_cov, log_joint_i)
   }
 

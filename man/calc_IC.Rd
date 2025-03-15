@@ -34,9 +34,3 @@ Widely Applicable Information Criterion (WAIC),
 and Leave-One-Out #' Information Criterion (LOOIC)
 for Bayesian latent variable models based on the log likelihood.
 }
-\examples{
-\donttest{
-calc_IC(...)  # need another file
-}
-
-}
