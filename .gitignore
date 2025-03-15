@@ -1,2 +1,4 @@
 .Rproj.user
 
+vignettes/*.html
+vignettes/*.Rhistory
