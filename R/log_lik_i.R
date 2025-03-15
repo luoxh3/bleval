@@ -1,13 +1,29 @@
 
 #' @title Log Likelihood for Unit i
 #'
-#' @param samples_s A vector of Bayesian posterior sample s of model parameters.
+#' @description
+#' This function computes the log likelihood for a specific unit by integrating out
+#' the latent variables using numerical quadrature.
+#' It is a helper function used internally by `log_lik()` to compute the
+#' log likelihood for each unit.
+#'
+#' @param samples_s A vector of Bayesian posterior samples of model parameters.
 #' @param data A list of data, including an element 'N' which indicates the number of units
 #' @param i Index of the unit for which to compute the log likelihood.
-#' @param Ngrid Number of grid per dimension.
+#' @param Ngrid Number of grid (quadrature nodes) per dimension.
 #' @param lv_mu A list of posterior means for the latent variables.
-#' @param lv_cov A list of posterior covariance matrix for latent variables.
-#' @param log_joint_i A function that computes the log joint probability for unit i.
+#'    Each element corresponds to the posterior mean of the latent variables
+#'    for a specific unit.
+#' @param lv_cov A list of posterior covariance matrix for the latent variables.
+#'    Each element corresponds to the posterior covariance matrix of
+#'    the latent variables for a specific unit.
+#' @param log_joint_i A user-defined function that computes the log joint probability
+#'    for a given unit. This function should take the following arguments:
+#'    - `samples_s`: A vector of parameter values from a posterior sample.
+#'    - `data`: The data list.
+#'    - `i`: The index of the unit.
+#'    - `Ngrid`: The number of quadrature nodes.
+#'    - `nodes`: A matrix of quadrature nodes transformed using the latent variable mean and covariance.
 #'
 #' @returns The log likelihood for unit i.
 #'
@@ -34,7 +50,7 @@ log_lik_i <- function(samples_s, data, i, Ngrid, lv_mu, lv_cov, log_joint_i) {
 
     # Compute log of the standard normal density for each quadrature point
     # Adjust by the standard deviation (sqrt of variance) for the unit i
-    log_std_i <- dnorm(nodes_Ndim, mean = 0, sigma = 1, log = TRUE) - log(sqrt(lv_cov_i))
+    log_std_i <- dnorm(nodes_Ndim, mean = 0, sd = 1, log = TRUE) - log(sqrt(lv_cov_i))
 
     # Transform quadrature nodes using the latent variable mean and standard deviation
     nodes <- t(apply(nodes_Ndim, 1, function(z) lv_mu_i + sqrt(lv_cov_i) * z))

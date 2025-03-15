@@ -4,7 +4,7 @@
 #' @description
 #' Calculates the Deviance Information Criterion (DIC),
 #' Widely Applicable Information Criterion (WAIC),
-#' and Leave-One-Out #' Information Criterion (LOOIC)
+#' and Leave-One-Out Information Criterion (LOOIC)
 #' for Bayesian latent variable models based on the log likelihood.
 #'
 #' @param log_lik_result A list returned by the `log_lik()` function, which contains:

@@ -5,17 +5,20 @@
 #' Generates the quadrature nodes and weights using Gaussian quadrature
 #' for a specified number of grid points and dimensions.
 #' The quadrature is based on a standard normal distribution (mean = 0, sd = 1).
+#' The function is used internally by `log_lik_i()` to perform
+#' numerical integration over latent variables.
 #'
-#' @param Ngrid Number of grid per dimension.
+#' @param Ngrid Number of grid (quadrature nodes) per dimension.
 #' @param Ndim Number of dimensions for the latent variables.
+#'    This corresponds to the number of latent variables in the model.
 #'
 #' @return A list containing the following elements:
-#'   \item{nodes}{A matrix of quadrature nodes, where each row represents a
-#'   specific combination of nodes from the 1D Gaussian quadrature expanded
-#'   into the multidimensional grid using `expand.grid`.}
-#'   \item{weights}{A vector of quadrature weights corresponding to the nodes.}
-#'   \item{log_weights}{A vector of the log of the weights,
-#'   typically used in logarithmic space computations.}
+#'    \item{nodes}{A matrix of quadrature nodes, where each row represents a
+#'    specific combination of nodes from the 1D Gaussian quadrature expanded
+#'    into the multidimensional grid using `expand.grid`.}
+#'    \item{weights}{A vector of quadrature weights corresponding to the nodes.}
+#'    \item{log_weights}{A vector of the log of the weights,
+#'    typically used in logarithmic space computations.}
 #'
 #' @importFrom statmod gauss.quad.prob
 #'

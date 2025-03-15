@@ -31,6 +31,6 @@ A named vector containing the following information criteria:
 \description{
 Calculates the Deviance Information Criterion (DIC),
 Widely Applicable Information Criterion (WAIC),
-and Leave-One-Out #' Information Criterion (LOOIC)
+and Leave-One-Out Information Criterion (LOOIC)
 for Bayesian latent variable models based on the log likelihood.
 }

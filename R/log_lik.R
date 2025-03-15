@@ -2,21 +2,39 @@
 #' @title Log Likelihood per Point and based on Posterior Mean
 #'
 #' @description
-#' Computes ...
+#' This function computes the log likelihood for each data point and
+#' the log likelihood based on the posterior mean of the parameters.
+#' It is designed for Bayesian latent variable models, where the likelihood
+#' is computed by integrating out latent variables using numerical quadrature.
+#' The function supports parallel computation to improve efficiency for large datasets.
+#'
 #'
 #' @param samples A matrix or data frame of Bayesian posterior samples of model parameters.
-#' @param data A list of data, including an element 'N' which indicates the number of units
-#' @param Ngrid Number of grid per dimension.
+#'    Each row represents a sample, and each column represents a parameter.
+#' @param data A list of data, including an element 'N' which indicates the number of units.
+#' @param Ngrid Number of grid (quadrature nodes) per dimension.
 #' @param lv_mu A list of posterior means for the latent variables.
-#' @param lv_cov A list of posterior covariance matrix for latent variables.
-#' @param log_joint_i A function that computes the log joint probability for unit i.
+#'    Each element corresponds to the posterior mean of the latent variables
+#'    for a specific unit.
+#' @param lv_cov A list of posterior covariance matrix for the latent variables.
+#'    Each element corresponds to the posterior covariance matrix of
+#'    the latent variables for a specific unit.
+#' @param log_joint_i A user-defined function that computes the log joint probability
+#'    for a given unit. This function should take the following arguments:
+#'    - `samples_s`: A vector of parameter values from a posterior sample.
+#'    - `data`: The data list.
+#'    - `i`: The index of the unit.
+#'    - `Ngrid`: The number of quadrature nodes.
+#'    - `nodes`: A matrix of quadrature nodes transformed using the latent variable mean and covariance.
 #' @param parallel A logical indicating whether to compute in parallel (default is TRUE).
 #' @param n_cores Number of cores to use for parallel computation. Defaults to `detectCores() - 2`.
 #' @param packages A character vector of package names to be loaded in the parallel environment.
 #'
 #' @return A list containing two elements:
-#'   \item{loglik_point}{A matrix of log likelihoods for each data point.}
-#'   \item{loglik_postmean}{A vector of log likelihoods computed using the posterior mean of the parameters.}
+#'    \item{loglik_point}{A matrix of log likelihoods for each data point.
+#'    Each row corresponds to a posterior sample, and each column corresponds to a unit.}
+#'    \item{loglik_postmean}{A vector of log likelihoods computed using the posterior mean
+#'    of the parameters. Each element corresponds to a unit.}
 #'
 #' @importFrom doParallel registerDoParallel
 #' @importFrom parallel makeCluster

@@ -7,9 +7,10 @@
 get_quadrature(Ngrid, Ndim)
 }
 \arguments{
-\item{Ngrid}{Number of grid per dimension.}
+\item{Ngrid}{Number of grid (quadrature nodes) per dimension.}
 
-\item{Ndim}{Number of dimensions for the latent variables.}
+\item{Ndim}{Number of dimensions for the latent variables.
+This corresponds to the number of latent variables in the model.}
 }
 \value{
 A list containing the following elements:
@@ -24,6 +25,8 @@ typically used in logarithmic space computations.}
 Generates the quadrature nodes and weights using Gaussian quadrature
 for a specified number of grid points and dimensions.
 The quadrature is based on a standard normal distribution (mean = 0, sd = 1).
+The function is used internally by \code{log_lik_i()} to perform
+numerical integration over latent variables.
 }
 \examples{
 get_quadrature(5, 2)  # Generate quadrature nodes and weights for 2D

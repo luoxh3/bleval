@@ -7,23 +7,38 @@
 log_lik_i(samples_s, data, i, Ngrid, lv_mu, lv_cov, log_joint_i)
 }
 \arguments{
-\item{samples_s}{A vector of Bayesian posterior sample s of model parameters.}
+\item{samples_s}{A vector of Bayesian posterior samples of model parameters.}
 
 \item{data}{A list of data, including an element 'N' which indicates the number of units}
 
 \item{i}{Index of the unit for which to compute the log likelihood.}
 
-\item{Ngrid}{Number of grid per dimension.}
+\item{Ngrid}{Number of grid (quadrature nodes) per dimension.}
 
-\item{lv_mu}{A list of posterior means for the latent variables.}
+\item{lv_mu}{A list of posterior means for the latent variables.
+Each element corresponds to the posterior mean of the latent variables
+for a specific unit.}
 
-\item{lv_cov}{A list of posterior covariance matrix for latent variables.}
+\item{lv_cov}{A list of posterior covariance matrix for the latent variables.
+Each element corresponds to the posterior covariance matrix of
+the latent variables for a specific unit.}
 
-\item{log_joint_i}{A function that computes the log joint probability for unit i.}
+\item{log_joint_i}{A user-defined function that computes the log joint probability
+for a given unit. This function should take the following arguments:
+\itemize{
+\item \code{samples_s}: A vector of parameter values from a posterior sample.
+\item \code{data}: The data list.
+\item \code{i}: The index of the unit.
+\item \code{Ngrid}: The number of quadrature nodes.
+\item \code{nodes}: A matrix of quadrature nodes transformed using the latent variable mean and covariance.
+}}
 }
 \value{
 The log likelihood for unit i.
 }
 \description{
-Log Likelihood for Unit i
+This function computes the log likelihood for a specific unit by integrating out
+the latent variables using numerical quadrature.
+It is a helper function used internally by \code{log_lik()} to compute the
+log likelihood for each unit.
 }
