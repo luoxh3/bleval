@@ -141,7 +141,7 @@ To use `bleval`, we first need to install the package. The following two options
 ```{r}
 # Note: This package is not yet public. For now, it can only be installed locally.
 # Once it's public, use the following command to install it.
-# devtools::install_github("luoxh3/bleval")
+devtools::install_github("luoxh3/bleval")
 ```
 
 2.  **Manually install from a local `.tar.gz` file:**
@@ -154,8 +154,6 @@ install.packages("D:/2_PhD/C_project/P15_marginal likelihood_tutorial/bleval/ble
 Then, we can load the package:
 
 ```{r}
-# unloadNamespace("bleval")
-# remove.packages("bleval", lib = "D:/Software/R/R-4.2.2/library")
 library(bleval, lib.loc = "D:/Software/R/R-4.2.2/library")
 ```
 
