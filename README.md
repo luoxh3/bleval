@@ -1,6 +1,6 @@
 # bleval: Bayesian Evaluation Criteria for Latent Variable Models
 
-## Overview
+## 🔍 Overview
 
 The `bleval` package provides tools for evaluating Bayesian latent variable models, such as structural equation models (SEMs), item response theory (IRT) models, and multilevel models (MLMs). It uses **adaptive Gauss-Hermite quadrature** to approximate likelihoods by integrating out latent variables, supporting the computation of widely used Bayesian evaluation criteria, including:
 
@@ -15,7 +15,7 @@ With user-friendly functions and step-by-step guidance, bleval facilitates the p
 
 ------------------------------------------------------------------------
 
-## Workflow
+## 🧊️ Workflow
 
 The workflow of the `bleval` package is illustrated in the figure below:
 
@@ -30,15 +30,7 @@ The workflow of the `bleval` package is illustrated in the figure below:
 
 ------------------------------------------------------------------------
 
-## Author
-
-**Xiaohui Luo** (Maintainer)\
-Email: [xiaohui_luo\@mail.bnu.edu.cn](mailto:xiaohui_luo@mail.bnu.edu.cn){.email}\
-ORCID: [0000-0002-6462-0220](https://orcid.org/0000-0002-6462-0220)
-
-------------------------------------------------------------------------
-
-## Citation
+## 📘 Citation
 
 If you use the `bleval` package in your research, please cite it as follows:
 
@@ -47,7 +39,7 @@ If you use the `bleval` package in your research, please cite it as follows:
 
 ------------------------------------------------------------------------
 
-## Installation
+## 🌐 Installation
 
 You can install the `bleval` package directly from GitHub using the `devtools` package:
 
@@ -61,11 +53,11 @@ devtools::install_github("luoxh3/bleval")
 
 ------------------------------------------------------------------------
 
-## Example: Evaluating a Gaussian Linear Mixed Model
+## 📊 Example: Evaluating a Gaussian Linear Mixed Model
 
 This guide demonstrates how to use the `bleval` package to evaluate a Bayesian Gaussian linear mixed model with a random intercept and a random slope. The example is based on a simulated dataset.
 
-### Data Generation
+### 🔵 Data Generation
 
 We generate a dataset from a Gaussian linear mixed model with 500 level-2 units and 50 level-1 units per level-2 unit.
 
@@ -97,7 +89,7 @@ mydata <- left_join(mydata, bdata[, c("ID", "phi_i","mu_i")], by = "ID")
 mydata$y_it <- mydata$mu_i + mydata$x_it*mydata$phi_i + mydata$e_it
 ```
 
-### Parameter Estimation in JAGS
+### 🔵 Parameter Estimation in JAGS
 
 We define the data-generating Bayesian model in JAGS and estimate parameters using MCMC sampling.
 
@@ -162,11 +154,11 @@ samps2 <- as.matrix(samps[ ,pars_vector])
 dim(samps2)
 ```
 
-### Model Evaluation with `bleval`
+### 🔵 Model Evaluation with `bleval`
 
 We now evaluate the model using the `bleval` package step by step.
 
-#### Compute Information Criteria
+#### 🎯 Compute Information Criteria
 
 **Step 1: Specify the `log_joint_i` function**
 
@@ -271,7 +263,7 @@ The output of this function includes the following information criteria:
 -   WAIC: Watanabe-Akaike Information Criterion
 -   LOOIC: Leave-One-Out Information Criterion
 
-#### Compute Marginal Likelihood
+#### 🎯 Compute Marginal Likelihood
 
 **Step 1: Specify the `log_prior` function**
 
