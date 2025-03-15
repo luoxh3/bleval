@@ -1,4 +1,7 @@
 .Rproj.user
 
 vignettes/*.html
+<<<<<<< HEAD
 vignettes/*.Rhistory
+=======
+>>>>>>> 3ba4a713a7d5d7babea6ddff59784514e867c0c9
