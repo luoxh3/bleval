@@ -57,6 +57,8 @@ devtools::install_github("luoxh3/bleval")
 
 This guide demonstrates how to use the `bleval` package to evaluate a Bayesian Gaussian linear mixed model with a random intercept and a random slope. The example is based on a simulated dataset.
 
+Note: For more detailed examples of using the `bleval` package with **multilevel models (MLM)**, **structural equation models (SEM)**, and **item response theory (IRT) models** (based on empirical data), please refer to the vignette.
+
 ### 🔵 Data Generation
 
 We generate a dataset from a Gaussian linear mixed model with 500 level-2 units and 50 level-1 units per level-2 unit.
