@@ -12,7 +12,7 @@
 #' @param samples A matrix or data frame of Bayesian posterior samples of model parameters.
 #'    Each row represents a sample, and each column represents a parameter.
 #' @param data A list of data, including an element 'N' which indicates the number of units.
-#' @param Ngrid Number of grid (quadrature nodes) per dimension.
+#' @param Ngrid Number of grid points (quadrature nodes) per dimension.
 #' @param lv_mu A list of posterior means for the latent variables.
 #'    Each element corresponds to the posterior mean of the latent variables
 #'    for a specific unit.
@@ -24,7 +24,7 @@
 #'    - `samples_s`: A vector of parameter values from a posterior sample.
 #'    - `data`: The data list.
 #'    - `i`: The index of the unit.
-#'    - `Ngrid`: The number of quadrature nodes.
+#'    - `Ngrid`: Number of grid points (quadrature nodes) per dimension.
 #'    - `nodes`: A matrix of quadrature nodes transformed using the latent variable mean and covariance.
 #' @param parallel A logical indicating whether to compute in parallel (default is TRUE).
 #' @param n_cores Number of cores to use for parallel computation. Defaults to `detectCores() - 2`.
@@ -75,7 +75,7 @@ log_lik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
 
     # Validate that the data contains an element 'N'
     if (!"N" %in% names(data)) {
-      stop("'data' must contain an element named 'N'.")
+      stop("'data' must contain an element named 'N' which indicates the number of units.")
     }
 
     # Start parallel processing using the specified number of cores

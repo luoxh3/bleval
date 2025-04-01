@@ -10,7 +10,7 @@
 #' @param samples_s A vector of Bayesian posterior samples of model parameters.
 #' @param data A list of data, including an element 'N' which indicates the number of units
 #' @param i Index of the unit for which to compute the log likelihood.
-#' @param Ngrid Number of grid (quadrature nodes) per dimension.
+#' @param Ngrid Number of grid points (quadrature nodes) per dimension.
 #' @param lv_mu A list of posterior means for the latent variables.
 #'    Each element corresponds to the posterior mean of the latent variables
 #'    for a specific unit.
@@ -22,7 +22,7 @@
 #'    - `samples_s`: A vector of parameter values from a posterior sample.
 #'    - `data`: The data list.
 #'    - `i`: The index of the unit.
-#'    - `Ngrid`: The number of quadrature nodes.
+#'    - `Ngrid`: Number of grid points (quadrature nodes) per dimension.
 #'    - `nodes`: A matrix of quadrature nodes transformed using the latent variable mean and covariance.
 #'
 #' @returns The log likelihood for unit i.
@@ -50,7 +50,7 @@ log_lik_i <- function(samples_s, data, i, Ngrid, lv_mu, lv_cov, log_joint_i) {
 
     # Compute log of the standard normal density for each quadrature point
     # Adjust by the standard deviation (sqrt of variance) for the unit i
-    log_std_i <- dnorm(nodes_Ndim, mean = 0, sd = 1, log = TRUE) - log(sqrt(lv_cov_i))
+    log_std_i <- t( dnorm(nodes_Ndim, mean = 0, sd = 1, log = TRUE) - log(sqrt(lv_cov_i)) )
 
     # Transform quadrature nodes using the latent variable mean and standard deviation
     nodes <- t(apply(nodes_Ndim, 1, function(z) lv_mu_i + sqrt(lv_cov_i) * z))

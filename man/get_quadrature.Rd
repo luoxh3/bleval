@@ -7,16 +7,18 @@
 get_quadrature(Ngrid, Ndim)
 }
 \arguments{
-\item{Ngrid}{Number of grid (quadrature nodes) per dimension.}
+\item{Ngrid}{Number of grid points (quadrature nodes) per dimension.}
 
 \item{Ndim}{Number of dimensions for the latent variables.
 This corresponds to the number of latent variables in the model.}
 }
 \value{
 A list containing the following elements:
-\item{nodes}{A matrix of quadrature nodes, where each row represents a
-specific combination of nodes from the 1D Gaussian quadrature expanded
-into the multidimensional grid using \code{expand.grid}.}
+\item{nodes}{A matrix of quadrature nodes with dimensions
+\eqn{N_{\text{nodes}} \times N_{\text{dim}}}{Nnodes × Ndim}, where
+\eqn{N_{\text{nodes}} = \text{Ngrid}^{\text{Ndim}}}{Nnodes = Ngrid^Ndim}.
+Each column represents a specific combination of nodes from the 1D Gaussian
+quadrature expanded into the multidimensional grid using \code{expand.grid}.}
 \item{weights}{A vector of quadrature weights corresponding to the nodes.}
 \item{log_weights}{A vector of the log of the weights,
 typically used in logarithmic space computations.}

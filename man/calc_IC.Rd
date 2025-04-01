@@ -23,14 +23,14 @@ A named vector containing the following information criteria:
 \item{dic}{The Deviance Information Criterion (DIC), computed as -2 * elpd_dic.}
 \item{p_waic}{The effective number of parameters for WAIC.}
 \item{elpd_waic}{The expected log pointwise predictive density for WAIC.}
-\item{waic}{The Widely Applicable Information Criterion (WAIC).}
+\item{waic}{The Watanabe-Akaike Information Criterion (WAIC).}
 \item{p_looic}{The effective number of parameters for LOOIC.}
 \item{elpd_looic}{The expected log pointwise predictive density for LOOIC.}
 \item{looic}{The Leave-One-Out Information Criterion (LOOIC).}
 }
 \description{
 Calculates the Deviance Information Criterion (DIC),
-Widely Applicable Information Criterion (WAIC),
+Watanabe-Akaike Information Criterion (WAIC),
 and Leave-One-Out Information Criterion (LOOIC)
 for Bayesian latent variable models based on the log likelihood.
 }

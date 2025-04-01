@@ -12,7 +12,7 @@
 #' @param samples A matrix or data frame of Bayesian posterior samples of model parameters.
 #'    Each row represents a sample, and each column represents a parameter.
 #' @param data A list of data, including an element 'N' which indicates the number of units.
-#' @param Ngrid Number of grid (quadrature nodes) per dimension.
+#' @param Ngrid Number of grid points (quadrature nodes) per dimension.
 #' @param lv_mu A list of posterior means for the latent variables.
 #'    Each element corresponds to the posterior mean of the latent variables
 #'    for a specific unit.
@@ -24,7 +24,7 @@
 #'    - `samples_s`: A vector of parameter values from a posterior sample.
 #'    - `data`: The data list.
 #'    - `i`: The index of the unit.
-#'    - `Ngrid`: The number of quadrature nodes.
+#'    - `Ngrid`: Number of grid points (quadrature nodes) per dimension.
 #'    - `nodes`: A matrix of quadrature nodes transformed using the latent variable mean and covariance.
 #' @param log_prior A user-defined function that computes the log prior probabilities
 #'    of the model parameters. This function should take the following argument:

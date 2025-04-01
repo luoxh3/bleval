@@ -91,7 +91,7 @@ model_string <- "
 data_list <- list(
   Nobs = nrow(mydata),
   subject = mydata$ID,
-  N = length(unique(mydata$ID)),
+  N = length(unique(mydata$ID)),  
   y = mydata$y_it,
   x = mydata$x_it
 )

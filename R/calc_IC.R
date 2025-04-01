@@ -3,7 +3,7 @@
 #'
 #' @description
 #' Calculates the Deviance Information Criterion (DIC),
-#' Widely Applicable Information Criterion (WAIC),
+#' Watanabe-Akaike Information Criterion (WAIC),
 #' and Leave-One-Out Information Criterion (LOOIC)
 #' for Bayesian latent variable models based on the log likelihood.
 #'
@@ -22,7 +22,7 @@
 #'    \item{dic}{The Deviance Information Criterion (DIC), computed as -2 * elpd_dic.}
 #'    \item{p_waic}{The effective number of parameters for WAIC.}
 #'    \item{elpd_waic}{The expected log pointwise predictive density for WAIC.}
-#'    \item{waic}{The Widely Applicable Information Criterion (WAIC).}
+#'    \item{waic}{The Watanabe-Akaike Information Criterion (WAIC).}
 #'    \item{p_looic}{The effective number of parameters for LOOIC.}
 #'    \item{elpd_looic}{The expected log pointwise predictive density for LOOIC.}
 #'    \item{looic}{The Leave-One-Out Information Criterion (LOOIC).}
@@ -56,7 +56,7 @@ calc_IC <- function(log_lik_result, p_dic_version) {
   # Deviance Information Criterion (DIC) and expected log predictive density (elpd)
   elpd_dic <- loglik_postmean - p_dic
 
-  # Calculate WAIC (Widely Applicable Information Criterion)
+  # Calculate WAIC (Watanabe-Akaike Information Criterion)
   waic_result <- loo::waic(log_lik_result$loglik_point)$estimates
   p_waic <- waic_result[2,1]
   elpd_waic <- waic_result[1,1]

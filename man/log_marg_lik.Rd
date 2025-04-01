@@ -23,7 +23,7 @@ Each row represents a sample, and each column represents a parameter.}
 
 \item{data}{A list of data, including an element 'N' which indicates the number of units.}
 
-\item{Ngrid}{Number of grid (quadrature nodes) per dimension.}
+\item{Ngrid}{Number of grid points (quadrature nodes) per dimension.}
 
 \item{lv_mu}{A list of posterior means for the latent variables.
 Each element corresponds to the posterior mean of the latent variables
@@ -39,7 +39,7 @@ for a given unit. This function should take the following arguments:
 \item \code{samples_s}: A vector of parameter values from a posterior sample.
 \item \code{data}: The data list.
 \item \code{i}: The index of the unit.
-\item \code{Ngrid}: The number of quadrature nodes.
+\item \code{Ngrid}: Number of grid points (quadrature nodes) per dimension.
 \item \code{nodes}: A matrix of quadrature nodes transformed using the latent variable mean and covariance.
 }}
 
