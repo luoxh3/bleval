@@ -1,4 +1,4 @@
-# bleval: Bayesian Evaluation Criteria for Latent Variable Models
+# bleval: Bayesian Evaluation for Latent Variable Models
 
 ## 🔍 Overview
 
