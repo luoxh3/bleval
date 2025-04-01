@@ -20,9 +20,9 @@ This document demonstrates the evaluation of a Bayesian latent moderation struct
 We begin by loading the `bleval` package and the dataset `example1_LMSEM`, which contains the observed variables for the latent moderation structural equation model.
 
 ```{r}
-# Install the bleval package from a local `.tar.gz` file
-install.packages("D:/2_PhD/C_project/P15_marginal likelihood_tutorial/bleval/bleval_0.0.0.9000.tar.gz",
-                 repos = NULL, lib = "D:/Software/R/R-4.2.2/library")
+# Install the bleval package from GitHub
+devtools::install_github("luoxh3/bleval")
+
 # Load the package
 library(bleval, lib.loc = "D:/Software/R/R-4.2.2/library") 
 
