@@ -1,0 +1,327 @@
+---
+title: "Bayesian Evaluation of a Generalized Partial Credit Model Using the bleval Package"
+author: "Jieyuan Dong"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+## Introduction
+
+This document demonstrates the evaluation of a Bayesian Generalized Partial Credit Model (GPCM) using the `bleval` package. The model includes five latent personality traits. We illustrate the workflow from data preparation to model evaluation, including parameter estimation in CmdStan, convergence diagnostics, and computation of information criteria (DIC, WAIC, LOOIC) and marginal likelihood using the `bleval` package.
+
+## Read Data
+
+We begin by loading the `bleval` package and the dataset `example2_GPCM`, which contains the observed responses for the GPCM.
+
+```{r}
+# Install the bleval package
+devtools::install_github("luoxh3/bleval")
+# Load the package
+library(bleval)
+
+# Load the dataset from the bleval package
+data(example2_GPCM, package = "bleval")
+
+D <- 5  # number of traits (number of dimensions)
+K <- 5  # number of categories
+I <- nrow(example2_GPCM)  # number of respondents (i.e. units)
+J <- 20  # number of items
+
+res <- as.matrix(example2_GPCM)
+
+# Set the item-trait indicator
+it <- rep(1:D, each=J/D)
+  
+# Set the item-wording indicator
+iw <- rep(1, J)
+iw[grep("_R", names(example2_GPCM))] <- -1
+```
+
+## Parameter Estimation in CmdStan
+
+We define the Bayesian GPCM in CmdStan and estimate parameters using MCMC sampling.
+
+```{r}
+library(cmdstanr)
+library(posterior)
+
+stan_code <- "
+functions {  // function for GPCM
+  real gpcm(int y, real theta, real alpha, vector beta) {
+    vector[rows(beta) + 1] unsummed;
+    vector[rows(beta) + 1] probs;
+    unsummed = append_row(rep_vector(0.0, 1), alpha*(theta - beta));
+    probs = softmax(cumulative_sum(unsummed));
+    return categorical_lpmf(y | probs);
+  }
+}
+data {
+  int<lower=1> D;                      // number of traits
+  int<lower=1> I;                      // number of respondents
+  int<lower=1> J;                      // number of items
+  int<lower=1> N;                      // number of responses
+  int<lower=2> K;		                   // number of response categories
+  array[J] int<lower=1,upper=D> it;    // item-trait indicator
+  array[J] int<lower=-1,upper=1> iw;   // item-wording indicator
+  array[N] int<lower=1,upper=I> ii;    // person id
+  array[N] int<lower=1,upper=J> jj;    // item id
+  array[N] int<lower=1,upper=K> y;     // responses
+}
+parameters {
+  vector<lower=0>[J] alpha;            // item discrimination parameters
+  array[J] vector[K-1] beta;		       // item step difficulties
+  matrix[D, I] Z;		                   // std person traits
+  cholesky_factor_corr[D] L;           // Cholesky factor of correlation matrix of traits
+}
+transformed parameters{
+  matrix[D, D] Omega;                  // correlation matrix of traits
+  matrix[D, I] Theta;		               // person traits
+
+  Omega = multiply_lower_tri_self_transpose(L);
+  Theta = L * Z;
+}
+model {
+  // prior
+  alpha ~ lognormal(0, 1);
+  for (j in 1:J)
+    beta[j] ~ normal(0, 10);
+  L ~ lkj_corr_cholesky(1);
+  to_vector(Z) ~ normal(0, 1);
+
+  // likelihood
+  for (n in 1:N)
+    target += gpcm(y[n],
+      Theta[it[jj[n]], ii[n]], iw[jj[n]]*alpha[jj[n]], beta[jj[n]]);
+}
+"
+
+data_list <- list(
+  D = D,
+  K = K,
+  I = I,
+  J = J,
+  N = I*J,
+  iw = iw,
+  it = it,
+  ii = rep(1:I, each = J),
+  jj = rep(1:J, times = I),
+  y = as.vector(t(res))
+)
+
+# Compile the CmdStan model
+model_file <- write_stan_file(stan_code,  dir = getwd(), basename = "GPCM")
+stan_model <- cmdstan_model(model_file)
+
+# Run the No-U-Turn Sampler with a burn-in period of 2500 iterations
+fit <- stan_model$sample(
+  data = data_list,
+  seed = 1,
+  refresh = 500,          
+  chains = 4, 
+  parallel_chains = 4,
+  iter_warmup = 2500,
+  iter_sampling = 2500,
+  thin = 1,
+  show_messages = TRUE
+)
+
+# Draw posterior samples from the model
+draws <- fit$draws(format="df")
+
+# Extract posterior samples for model parameters only (excluding latent variables)
+# For the Cholesky factor of correlation matrix only the lower triangular elements are extracted
+par_cols <- grep("^alpha|^beta", names(draws), value = TRUE)
+par <- as.matrix(draws[, par_cols])
+
+L_cols <- grep("^L", names(draws), value = TRUE)
+L_lower_tri <- as.matrix(draws[, L_cols[lower.tri(diag(D))]])
+
+samples <- cbind(par, L_lower_tri)
+
+# Extract posterior samples for latent variables
+lv_draws <- as.matrix(draws[, grep("^Theta", colnames(draws))])
+```
+
+## Model Convergence Check
+
+We check the convergence of the MCMC chains using the Gelman-Rubin diagnostic (R-hat). A common threshold for convergence is R-hat \< 1.1.
+
+```{r}
+# Summarize the posterior samples and compute the Gelman-Rubin diagnostic (R-hat)
+summary <- fit$summary(NULL,
+                       posterior::default_summary_measures()[1:4],
+                       quantiles = ~ quantile2(., probs = c(0.025, 0.975)),
+                       posterior::default_convergence_measures())
+# Check the maximum R-hat
+max(summary[,"rhat"], na.rm = TRUE)
+```
+
+## Model Evaluation with `bleval`
+
+### Compute Information Criteria
+
+**Step 1: Specify the `log_joint_i` function**
+
+The `log_joint_i` function calculates the log joint density for each unit.
+
+```{r}
+log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
+  
+  # conditional likelihood
+  D <- data[["D"]]
+  J <- data[["J"]]
+  K <- data[["K"]]    
+  it <- data[["it"]]
+  iw <- data[["iw"]]
+  y_i <- data[["y"]][data[["ii"]]==i]
+  jj_i <- data.frame(jj=data[["jj"]][data[["ii"]]==i])
+  
+  alpha <- samples_s[grep("^alpha", names(samples_s), value = TRUE)]
+  beta <- matrix(samples_s[grep("^beta", names(samples_s), value = TRUE)],
+                 J, K - 1)
+  L_lower_tri <- samples_s[grep("^L", names(samples_s), value = TRUE)]
+  
+  L <- matrix(0, D, D)
+  L[lower.tri(L)] <- L_lower_tri
+  for (d in 1:D) {
+    L[d, d] <- sqrt(1 - sum(L[d, 1:(d - 1)]^2))
+  }  # Obtain the Cholesky factor of correlation matrix (L) using L_lower_tri
+  
+  Nnode <- nrow(nodes)
+  
+  Mu <- rep(0, D)
+  Omega <- L%*%t(L)  # Obtain the correlation matrix (Omega) using L
+  sigma <- rep(1, D)
+  Sigma <- diag(sigma)%*%Omega%*%diag(sigma)
+  
+  log_con_i_j <- apply(jj_i, 1, function(j){
+    int <- cumsum(c(0, -beta[j,]))
+    Int <- t(replicate(Nnode, int))
+    scoring <- t(replicate(Nnode, 0:(K-1)))
+    numerator <- exp(iw[j] * alpha[j] * (replicate(K, nodes[, it[j]])*scoring + Int))
+    denominator <- rowSums(numerator)
+    cat_prob <- numerator/denominator
+    
+    extraDistr::dcat(y_i[j], cat_prob, log=TRUE)
+  }) # conditional density given respondent i and item j
+  
+  if(is.vector(log_con_i_j))
+    log_con_i <- sum(log_con_i_j) else 
+    log_con_i <- rowSums(log_con_i_j)
+    
+  # log prior density of latent variables
+  log_lv_i <- mvtnorm::dmvnorm(nodes, mean=Mu, sigma=Sigma, log = TRUE)
+  
+  # return
+  log_lv_i + log_con_i
+}
+```
+
+**Step 2: Compute the posterior means and covariance matrices of latent variables**
+
+```{r}
+# Create lists to store posterior means and covariance matrices of latent traits
+lv_list <- list()
+for (i in 1:I){
+  lv_list[[i]] <- lv_draws[ ,((i-1)*D+1):(i*D)]
+}
+
+# Compute the posterior means of the latent traits for unit i
+lv_mu_list <- lapply(lv_list, colMeans)
+# Compute the posterior covariance matrices of the latent traits for unit i
+lv_cov_list <- lapply(lv_list, cov)
+
+# Make sure that N denotes the number of units (i.e. respondents) in the data to be passed to the functions below
+data_list$N <- data_list$I
+```
+
+**Step 3: Compute the log-likelihood with latent variables integrated out**
+
+The `log_lik` function from the `bleval` package computes the log likelihood by integrating out the latent variables using adaptive Gauss-Hermite quadrature.
+
+```{r}
+log_lik_result <- bleval::log_lik(samples = samples, data = data_list, Ngrid = 3,
+                                  lv_mu = lv_mu_list, lv_cov = lv_cov_list,
+                                  log_joint_i = log_joint_i, n_cores = 50)
+```
+
+**Step 4: Compute information criteria**
+
+The `calc_IC` function from the `bleval` package computes the information criteria (DIC, WAIC, and LOOIC) based on the log-likelihoods obtained from the `log_lik` function.
+
+```{r}
+bleval::calc_IC(log_lik_result, 1)
+```
+
+### Compute Marginal Likelihood
+
+**Step 1: Specify the `log_prior` function**
+
+The `log_prior` function calculates the log prior density for model parameters. This function takes a named vector of parameter values from a posterior sample and returns the log prior density for each parameter.
+
+```{r}
+log_prior <- function(samples_s) {
+  
+  alpha <- samples_s[grep("^alpha", names(samples_s), value = TRUE)]
+  beta <- samples_s[grep("^beta", names(samples_s), value = TRUE)]
+  L_lower_tri <- samples_s[grep("^L", names(samples_s), value = TRUE)]
+
+  D <- 5
+  L <- matrix(0, D, D)
+  L[lower.tri(L)] <- L_lower_tri
+  for (d in 1:D) {
+    L[d, d] <- sqrt(1 - sum(L[d, 1:(d-1)]^2))
+  }  # Obtain the Cholesky factor of correlation matrix (L) using L_lower_tri
+
+  lkj_corr_cholesky_lpdf <- function(L, eta) {
+    D <- nrow(L)
+    if (D <= 1) return(0)
+    log_prob <- 0
+    for (k in 1:(D - 1)) {
+      log_prob <- log_prob + (2*eta - 2 + (D - 1 - k)) * log(L[k, k])
+    }
+
+    constant <- 0
+    for (k in 1:(D - 1)) {
+      a <- eta + 0.5 * (D - k - 1)
+      term <- (D - k - 1)*log(2) + 2*lgamma(a) - lgamma(2*a)
+      constant <- constant + term
+    }
+    log_prob - constant
+  }
+
+  sum(dlnorm(alpha, meanlog = 0, sdlog = 1, log = TRUE)) +
+  sum(dnorm(beta, mean = 0, sd = 10, log = TRUE)) +
+  lkj_corr_cholesky_lpdf(L, eta = 1)
+}
+```
+
+**Step 2: Define parameter bounds**
+
+The `log_marg_lik` function requires lower and upper bounds for the model parameters.
+
+```{r}
+lb <- c(rep(0, J), rep(-Inf, J*(K-1)), rep(-Inf, ncol(L_lower_tri)))
+ub <- c(rep(Inf, J), rep(Inf, J*(K-1)), rep(Inf, ncol(L_lower_tri)))
+
+names(lb) <- names(ub) <- colnames(samples)
+```
+
+**Step 3: Compute the log marginal likelihood with both latent variables and model parameters integrated out**
+
+The `log_marg_lik` function from the `bleval` package computes the log marginal likelihood by integrating out both the latent variables and the model parameters.
+
+```{r}
+bleval::log_marg_lik(samples = samples, data = data_list, Ngrid = 3, 
+                     lv_mu = lv_mu_list, lv_cov = lv_cov_list, 
+                     log_joint_i = log_joint_i, log_prior = log_prior, 
+                     lb = lb, ub = ub)
+```
+
+The output of this function is the log marginal likelihood, which can be used to compute Bayes factors for model comparison.

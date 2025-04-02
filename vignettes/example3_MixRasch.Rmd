@@ -1,0 +1,266 @@
+---
+title: "Bayesian Evaluation of a Mixture Rasch Model Using the bleval Package"
+author: "Jieyuan Dong"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+## Introduction
+
+This document demonstrates the evaluation of a Bayesian mixture Rasch Model using the `bleval` package. The model includes a latent ability (writing knowledge) and a latent class variable. We illustrate the workflow from data preparation to model evaluation, including parameter estimation in CmdStan, convergence diagnostics, and computation of information criteria (DIC, WAIC, LOOIC) and marginal likelihood using the `bleval` package.
+
+## Read Data
+
+We begin by loading the `bleval` package and the dataset `example3_MixRasch`, which contains the observed responses for the mixture Rasch Model.
+
+```{r}
+# Install the bleval package
+devtools::install_github("luoxh3/bleval")
+# Load the package
+library(bleval)
+
+# Load the dataset from the bleval package
+data(example3_MixRasch, package = "bleval")
+
+D <- 1  # number of dimensions
+K <- 2  # number of latent classes
+I <- nrow(example3_MixRasch)  # number of respondents (i.e. units)
+J <- 7  # number of items
+
+res <- as.matrix(example3_MixRasch)
+```
+
+## Parameter Estimation in CmdStan
+
+We define the Bayesian mixture Rasch model in CmdStan and estimate parameters using MCMC sampling.
+
+```{r}
+library(cmdstanr)
+library(posterior)
+
+stan_code <- "
+data {
+  int<lower=1> I;                      // number of examminees
+  int<lower=1> J;                      // number of items
+  int<lower=1> N;                      // number of responses
+  int<lower=2> K;                      // number of classes
+  array[N] int<lower=1,upper=I> ii;    // person id
+  array[N] int<lower=1,upper=J> jj;    // item id
+  array[N] int<lower=0,upper=1> y;     // responses
+}
+parameters {
+  positive_ordered[K] lambda;          // ordered component
+  array[J] vector[K] beta;		         // item difficulty
+  vector<lower=0>[K] sigma;            // sd of person ability within each class
+  vector[I] theta;                     // person ability
+}
+transformed parameters{
+  simplex[K] pi = lambda/sum(lambda);	 // mixing proportions
+  // Note that pi is the real model parameters, and lambda is introduced and 
+  // then normalized to generate pi with an ordered dirichlet prior
+}
+model {
+  vector[K] lpth;
+  vector[K] lps; 
+  
+  // prior
+  lambda ~ gamma(0.5, 1);
+  sigma ~ normal(0, 5);
+  for (j in 1:J)
+    beta[j] ~ normal(0, 1);
+    
+  for (i in 1:I){ 
+    for (k in 1:K){ 
+      lpth[k] = log(pi[k]) + normal_lpdf(theta[i] | 0, sigma[k]);
+    }
+    target += log_sum_exp(lpth);
+  }
+
+  // likelihood
+  for (n in 1:N){
+    for (k in 1:K){
+      lps[k] = log(pi[k]) + bernoulli_logit_lpmf(y[n] | theta[ii[n]] - beta[jj[n],k]);
+    }
+    target += log_sum_exp(lps);
+  }
+}"
+
+data_list <- list(
+  K = K,
+  I = I,
+  J = J,
+  N = I*J,
+  ii = rep(1:I, each = J),
+  jj = rep(1:J, times = I),
+  y = as.vector(t(res))
+)
+
+# Initialize the CmdStan model
+model_file <- write_stan_file(stan_code,  dir = getwd(), basename = "MixRasch")
+stan_model <- cmdstan_model(model_file)
+
+# Run the No-U-Turn Sampler with a burn-in period of 3500 iterations
+fit <- stan_model$sample(
+  data = data_list,
+  seed = 1,
+  refresh = 500,          
+  chains = 4, 
+  parallel_chains = 4,
+  iter_warmup = 3500,
+  iter_sampling = 2500,
+  thin = 1,
+  show_messages = TRUE
+)
+
+# Draw posterior samples from the model
+draws <- fit$draws(format="df")
+
+# Extract posterior samples for model parameters only (excluding latent variables)
+par_cols <- grep("^beta|^sigma|^lambda", names(draws), value = TRUE)
+samples <- as.matrix(draws[, par_cols])
+
+# Extract posterior samples for latent variables
+lv_draws <- as.matrix(draws[, grep("^theta", colnames(draws))])
+```
+
+## Model Convergence Check
+
+We check the convergence of the MCMC chains using the Gelman-Rubin diagnostic (R-hat). A common threshold for convergence is R-hat \< 1.1.
+
+```{r}
+# Summarize the posterior samples and compute the Gelman-Rubin diagnostic (R-hat)
+summary <- fit$summary(NULL,
+                       posterior::default_summary_measures()[1:4],
+                       quantiles = ~ quantile2(., probs = c(0.025, 0.975)),
+                       posterior::default_convergence_measures())
+# Check the maximum R-hat
+max(summary[,"rhat"], na.rm = TRUE)
+```
+
+## Model Evaluation with `bleval`
+
+### Compute Information Criteria
+
+**Step 1: Specify the `log_joint_i` function**
+
+The `log_joint_i` function calculates the log joint density for each unit.
+
+```{r}
+log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
+  
+  # conditional likelihood
+  J <- data[["J"]]
+  y_i <- data[["y"]][data[["ii"]]==i]
+  jj_i <- data.frame(jj=data[["jj"]][data[["ii"]]==i])
+  
+  lambda1 <- samples_s[1]
+  lambda2 <- samples_s[2]
+  beta1 <- samples_s[3:(J+2)]
+  beta2 <- samples_s[(J+3):(2*J+2)]
+  sigma1 <- samples_s[2*J+3]
+  sigma2 <- samples_s[2*J+4]
+  
+  pi1 <- lambda1/(lambda1 + lambda2)
+  pi2 <- lambda2/(lambda1 + lambda2)
+  
+  log_con_i_j <- apply(jj_i,1,function(j){
+    log(pi1*dbinom(y_i[j], 1, 1/(1+exp(-(nodes - beta1[j]))), log = FALSE) +
+      pi2*dbinom(y_i[j], 1, 1/(1+exp(-(nodes - beta2[j]))), log = FALSE))
+  })
+  
+  if(is.vector(log_con_i_j))
+    log_con_i <- sum(log_con_i_j) else 
+    log_con_i <- rowSums(log_con_i_j)
+    
+  # log prior density of latent variables
+  log_lv_i <- log(pi1*dnorm(nodes, mean=0, sd=sigma1, log = FALSE)+
+    pi2*dnorm(nodes, mean=0, sd=sigma2, log = FALSE))
+  
+  # return
+  log_lv_i + log_con_i
+}
+```
+
+**Step 2: Compute the posterior means and covariance matrices of latent variables**
+
+```{r}
+# Create lists to store posterior mean and variance of latent ability
+lv_list <- list()
+for (i in 1:I){
+  lv_list[[i]] <- lv_draws[ , ((i - 1)*D + 1):(i*D)]
+}
+
+# Compute the posterior mean of the latent ability for unit i
+lv_mu_list <- lapply(lv_list, mean)
+# Compute the posterior variance of the latent ability for unit i
+lv_cov_list <- lapply(lv_list, var)
+
+# Make sure that N denotes the number of units (i.e. respondents) in the data to be passed to the functions below
+data_list$N <- data_list$I
+```
+
+**Step 3: Compute the log-likelihood with latent variables integrated out**
+
+The `log_lik` function from the `bleval` package computes the log likelihood by integrating out the latent variables using adaptive Gauss-Hermite quadrature.
+
+```{r}
+log_lik_result <- bleval::log_lik(samples = samples, data = data_list, Ngrid = 5,
+                                  lv_mu = lv_mu_list, lv_cov = lv_cov_list,
+                                  log_joint_i = log_joint_i, n_cores = 10)
+```
+
+**Step 4: Compute information criteria**
+
+The `calc_IC` function from the `bleval` package computes the information criteria (DIC, WAIC, and LOOIC) based on the log-likelihoods obtained from the `log_lik` function.
+
+```{r}
+bleval::calc_IC(log_lik_result, 1)
+```
+
+### Compute Marginal Likelihood
+
+**Step 1: Specify the `log_prior` function**
+
+The `log_prior` function calculates the log prior density for model parameters. This function takes a named vector of parameter values from a posterior sample and returns the log prior density for each parameter.
+
+```{r}
+log_prior <- function(samples_s) {
+  lambda <- samples_s[grep("lambda",names(samples_s))]
+  beta <- samples_s[grep("beta",names(samples_s))]
+  sigma <- samples_s[grep("sigma",names(samples_s))]
+  
+  log(2) + sum(dgamma(lambda, shape = 0.5, rate = 1, log = TRUE)) +
+  sum(dnorm(beta, mean = 0, sd = 1, log = TRUE)) +
+  sum(log(truncdist::dtrunc(sigma, "norm", a = 0, b = Inf, mean = 0, sd = 5)))
+}
+```
+
+**Step 2: Define parameter bounds**
+
+The `log_marg_lik` function requires lower and upper bounds for the model parameters.
+
+```{r}
+lb <- c(rep(0, 2), rep(-Inf, 14), rep(0, 2))
+ub <- c(rep(Inf, 2), rep(Inf, 14), rep(Inf, 2))
+
+names(lb) <- names(ub) <- colnames(samples)
+```
+
+**Step 3: Compute the log marginal likelihood integrating out both latent variables and model parameters**
+
+The `log_marg_lik` function from the `bleval` package computes the log marginal likelihood by integrating out both the latent variables and the model parameters.
+
+```{r}
+bleval::log_marg_lik(samples = samples, data = data_list, Ngrid = 5, 
+                     lv_mu = lv_mu_list, lv_cov = lv_cov_list, 
+                     log_joint_i = log_joint_i, log_prior = log_prior, 
+                     lb = lb, ub = ub)
+```
+
+The output of this function is the log marginal likelihood, which can be used to compute Bayes factors for model comparison.
