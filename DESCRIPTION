@@ -1,5 +1,5 @@
 Package: bleval
-Title: Bayesian Evaluation Criteria for Latent Variable Models
+Title: Bayesian Evaluation for Latent Variable Models
 Version: 0.0.0.9000
 Authors@R: c(person(given="Xiaohui", family="Luo", role=c("aut", "cre"),
                     email="xiaohui_luo@mail.bnu.edu.cn",
@@ -24,6 +24,7 @@ Imports:
     bridgesampling,
     doParallel,
     extraDistr,
+    truncdist,
     foreach,
     loo,
     matrixStats,

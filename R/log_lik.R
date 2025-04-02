@@ -47,12 +47,13 @@
 #' @importFrom matrixStats logSumExp
 #' @importFrom mvtnorm dmvnorm
 #' @importFrom extraDistr ddirichlet
+#' @importFrom truncdist dtrunc
 #'
 #' @export
 #'
 log_lik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
                     parallel = TRUE, n_cores = detectCores() - 2,
-                    packages = c("matrixStats", "statmod", "mvtnorm", "extraDistr")) {
+                    packages = c("matrixStats", "statmod", "mvtnorm", "extraDistr","truncdist")) {
 
   ## log likelihood for each point ---------------------------------------------
 
