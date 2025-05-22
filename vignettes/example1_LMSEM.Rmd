@@ -168,7 +168,7 @@ max(subset(result, !(rownames(result) %in% c("lambdaM[1]", "lambdaX[1]", "lambda
 
 **Step 1: Specify the `log_joint_i` function**
 
-The `log_joint_i` function calculates the log joint probability for each unit.
+The `log_joint_i` function calculates the log joint density for each unit.
 
 ```{r}
 log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
@@ -246,29 +246,29 @@ for (i in 1:Nnum) {
 }
 ```
 
-**Step 3: Compute the log-likelihood integrating out latent variables**
+**Step 3: Compute the log marginal likelihood integrating out latent variables**
 
-The `log_lik` function from the `bleval` package computes the log likelihood by integrating out the latent variables using adaptive Gauss-Hermite quadrature.
+The `log_marglik` function from the `bleval` package computes the log marginal likelihood by integrating out the latent variables using adaptive Gauss-Hermite quadrature.
 
 ```{r}
-log_lik_result <- bleval::log_lik(samples = samps2, data = data_list, Ngrid = 5,
-                                  lv_mu = raneff_mu_list, lv_cov = raneff_cov_list,
-                                  log_joint_i = log_joint_i, n_cores = 3)
+log_marglik_result <- bleval::log_marglik(samples = samps2, data = data_list, Ngrid = 5,
+                                          lv_mu = raneff_mu_list, lv_cov = raneff_cov_list,
+                                          log_joint_i = log_joint_i, n_cores = 3)
 ```
 
 **Step 4: Compute information criteria**
 
-The `calc_IC` function from the `bleval` package computes the information criteria (DIC, WAIC, and LOOIC) based on the log-likelihoods obtained from the `log_lik` function.
+The `calc_IC` function from the `bleval` package computes the information criteria (DIC, WAIC, and LOOIC) based on the log marginal likelihoods obtained from the `log_marglik` function.
 
 ```{r}
-bleval::calc_IC(log_lik_result, 1)
+bleval::calc_IC(log_marglik_result, 1)
 ```
 
-### Compute Marginal Likelihood
+### Compute Fully Marginal Likelihood
 
 **Step 1: Specify the `log_prior` function**
 
-The `log_prior` function calculates the log prior probability for model parameters. This function takes a named vector of parameter values from a posterior sample and returns the log prior probability for each parameter.
+The `log_prior` function calculates the log prior density for model parameters. This function takes a named vector of parameter values from a posterior sample and returns the log prior density for each parameter.
 
 ```{r}
 log_prior <- function(samples_s) {
@@ -298,7 +298,7 @@ log_prior <- function(samples_s) {
 
 **Step 2: Define parameter bounds**
 
-The `log_marg_lik` function requires lower and upper bounds for the model parameters.
+The `log_fmarglik` function requires lower and upper bounds for the model parameters.
 
 ```{r}
 lb <- c(rep(-Inf, 18), rep(0, 21))
@@ -307,16 +307,16 @@ names(lb) <- pars_vector
 names(ub) <- pars_vector
 ```
 
-**Step 3: Compute the log marginal likelihood integrating out both latent variables and model parameters**
+**Step 3: Compute the log fully marginal likelihood integrating out both latent variables and model parameters**
 
-The `log_marg_lik` function from the `bleval` package computes the log marginal likelihood by integrating out both the latent variables and the model parameters.
+The `log_fmarglik` function from the `bleval` package computes the log fully marginal likelihood by integrating out both the latent variables and the model parameters.
 
 ```{r}
-bleval::log_marg_lik(samples = samps2,
+bleval::log_fmarglik(samples = samps2,
                      data = data_list, Ngrid = 5,
                      lv_mu = raneff_mu_list, lv_cov = raneff_cov_list,
                      log_joint_i = log_joint_i, log_prior = log_prior,
                      lb = lb, ub = ub)
 ```
 
-The output of this function is the log marginal likelihood, which can be used to compute Bayes factors for model comparison.
+The output of this function is the log fully marginal likelihood, which can be used to compute Bayes factors for model comparison.
