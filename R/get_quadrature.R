@@ -5,7 +5,7 @@
 #' Generates the quadrature nodes and weights using Gaussian quadrature
 #' for a specified number of grid points and dimensions.
 #' The quadrature is based on a standard normal distribution (mean = 0, sd = 1).
-#' The function is used internally by `log_lik_i()` to perform
+#' The function is used internally by `log_marglik_i()` to perform
 #' numerical integration over latent variables.
 #'
 #' @param Ngrid Number of grid points (quadrature nodes) per dimension.
@@ -29,9 +29,6 @@
 #' @examples
 #' get_quadrature(5, 2)  # Generate quadrature nodes and weights for 2D
 #'                       # with 5 grid points per dimension.
-#' \donttest{
-#' get_quadrature(5, 5)  # Example with 5 dimensions and 5 grid points.
-#' }
 #'
 get_quadrature <- function(Ngrid, Ndim) {
 

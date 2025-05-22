@@ -1,10 +1,10 @@
 
-#' @title Log Likelihood per Point and based on Posterior Mean
+#' @title Log Marginal Likelihood per Point and based on Posterior Mean
 #'
 #' @description
-#' This function computes the log likelihood for each data point and
-#' the log likelihood based on the posterior mean of the parameters.
-#' It is designed for Bayesian latent variable models, where the likelihood
+#' This function computes the log marginal likelihood for each data point and
+#' the log marginal likelihood based on the posterior mean of the parameters.
+#' It is designed for Bayesian latent variable models, where the marginal likelihood
 #' is computed by integrating out latent variables using numerical quadrature.
 #' The function supports parallel computation to improve efficiency for large datasets.
 #'
@@ -19,7 +19,7 @@
 #' @param lv_cov A list of posterior covariance matrix for the latent variables.
 #'    Each element corresponds to the posterior covariance matrix of
 #'    the latent variables for a specific unit.
-#' @param log_joint_i A user-defined function that computes the log joint probability
+#' @param log_joint_i A user-defined function that computes the log joint density
 #'    for a given unit. This function should take the following arguments:
 #'    - `samples_s`: A vector of parameter values from a posterior sample.
 #'    - `data`: The data list.
@@ -31,9 +31,9 @@
 #' @param packages A character vector of package names to be loaded in the parallel environment.
 #'
 #' @return A list containing two elements:
-#'    \item{loglik_point}{A matrix of log likelihoods for each data point.
+#'    \item{log_marglik_point}{A matrix of log marginal likelihoods for each data point.
 #'    Each row corresponds to a posterior sample, and each column corresponds to a unit.}
-#'    \item{loglik_postmean}{A vector of log likelihoods computed using the posterior mean
+#'    \item{log_marglik_postmean}{A vector of log marginal likelihoods computed using the posterior mean
 #'    of the parameters. Each element corresponds to a unit.}
 #'
 #' @importFrom doParallel registerDoParallel
@@ -51,11 +51,11 @@
 #'
 #' @export
 #'
-log_lik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
+log_marglik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
                     parallel = TRUE, n_cores = detectCores() - 2,
                     packages = c("matrixStats", "statmod", "mvtnorm", "extraDistr","truncdist")) {
 
-  ## log likelihood for each point ---------------------------------------------
+  ## log marginal likelihood for each point ------------------------------------
 
   # Ensure that n_cores is positive and does not exceed the available cores
   if (parallel) {
@@ -87,39 +87,40 @@ log_lik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
       stop("Parallel backend not registered properly. Please check.")
     }
 
-    loglik_point <- foreach(j = 1:nrow(samples), .combine = rbind,
-                            .packages = packages,
-                            .export = c("get_quadrature", "log_lik_i",
-                                        "data", "Ngrid", "lv_mu", "lv_cov",
-                                        "log_joint_i")) %dopar% {
-                              sapply(1:data$N, function(i) {
-                                bleval::log_lik_i(samples[j, ], data, i, Ngrid,
-                                                  lv_mu, lv_cov, log_joint_i)
-                              })
-                            }
+    log_marglik_point <- foreach(j = 1:nrow(samples), .combine = rbind,
+                                .packages = packages,
+                                .export = c("get_quadrature", "log_marglik_i",
+                                            "data", "Ngrid", "lv_mu", "lv_cov",
+                                            "log_joint_i")) %dopar% {
+                                  sapply(1:data$N, function(i) {
+                                    bleval::log_marglik_i(samples[j, ], data, i, Ngrid,
+                                                          lv_mu, lv_cov, log_joint_i)
+                                  })
+                                }
     stopCluster(cl)
 
   } else {
 
-    # If not using parallel, compute the log likelihood sequentially
-    loglik_point <- matrix(nrow = nrow(samples), ncol = data$N)
+    # If not using parallel, compute the log marginal likelihood sequentially
+    log_marglik_point <- matrix(nrow = nrow(samples), ncol = data$N)
     for (j in 1:nrow(samples)) {
       for (i in 1:data$N) {
-        loglik_point[j, i] <- bleval::log_lik_i(samples[j, ], data, i, Ngrid,
-                                                lv_mu, lv_cov, log_joint_i)
+        log_marglik_point[j, i] <- bleval::log_marglik_i(samples[j, ], data, i, Ngrid,
+                                                         lv_mu, lv_cov, log_joint_i)
       }
     }
   }
 
-  ## log likelihood based on posterior mean ------------------------------------
+  ## log marginal likelihood based on posterior mean ---------------------------
 
   samps2_thin_mean <- apply(samples, 2, mean)
-  loglik_postmean <- numeric(data$N)
+  log_marglik_postmean <- numeric(data$N)
   for (i in 1:data$N) {
-    loglik_postmean[i] <- bleval::log_lik_i(samps2_thin_mean, data, i, Ngrid,
-                                              lv_mu, lv_cov, log_joint_i)
+    log_marglik_postmean[i] <- bleval::log_marglik_i(samps2_thin_mean, data, i, Ngrid,
+                                                     lv_mu, lv_cov, log_joint_i)
   }
 
-  # Return a list containing loglik_point and loglik_postmean
-  return(list(loglik_point = loglik_point, loglik_postmean = loglik_postmean))
+  # Return a list containing log_marglik_point and log_marglik_postmean
+  return(list(log_marglik_point = log_marglik_point,
+              log_marglik_postmean = log_marglik_postmean))
 }
