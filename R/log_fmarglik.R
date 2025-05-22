@@ -52,6 +52,7 @@
 #'
 #' @export
 #'
+
 log_fmarglik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
                          log_prior, lb, ub, ...) {
 
