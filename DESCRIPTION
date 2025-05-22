@@ -8,9 +8,9 @@ Authors@R: c(person(given="Xiaohui", family="Luo", role=c("aut", "cre"),
              )
 Description: The bleval package provides tools for evaluating Bayesian latent 
     variable models, such as SEMs, IRT models, and MLMs. It uses adaptive 
-    Gauss-Hermite quadrature to approximate likelihoods by integrating out 
+    Gauss-Hermite quadrature to approximate marginal likelihoods by integrating out 
     latent variables, supporting the computation of DIC, WAIC, LOOIC, and 
-    marginal likelihoods for Bayes factors. With user-friendly functions 
+    fully marginal likelihoods for Bayes factors. With user-friendly functions 
     and step-by-step guidance, bleval facilitates the practical implementation 
     of Bayesian model evaluation, making it accessible for applied researchers 
     in psychology and related fields.
