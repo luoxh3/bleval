@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introduction
 
-This document demonstrates the evaluation of a Bayesian latent moderation structural equation model (LMSEM) using the `bleval` package. The model includes latent variables for predictors (X), moderators (M), and outcomes (Y), with an interaction term between X and M. We illustrate the workflow from data preparation to model evaluation, including parameter estimation in JAGS, convergence diagnostics, and computation of information criteria (DIC, WAIC, LOOIC) and marginal likelihood using the `bleval` package.
+This document demonstrates the evaluation of a Bayesian latent moderation structural equation model (LMSEM) using the `bleval` package. The model includes latent variables for predictors (X), moderators (M), and outcomes (Y), with an interaction term between X and M. We illustrate the workflow from data preparation to model evaluation, including parameter estimation in JAGS, convergence diagnostics, and computation of information criteria (DIC, WAIC, LOOIC) and fully marginal likelihood using the `bleval` package.
 
 ## Read Data
 
