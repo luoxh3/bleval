@@ -45,6 +45,13 @@
 #'      \item \code{niter}: number of iterations of the iterative updating scheme.
 #' }
 #'
+#' @importFrom doParallel registerDoParallel
+#' @importFrom parallel makeCluster
+#' @importFrom parallel stopCluster
+#' @importFrom parallel detectCores
+#' @importFrom foreach foreach
+#' @importFrom foreach getDoParWorkers
+#' @importFrom foreach "%dopar%"
 #' @importFrom statmod gauss.quad.prob
 #' @importFrom matrixStats logSumExp
 #' @importFrom mvtnorm dmvnorm
