@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 
 ## Introduction
 
-This document demonstrates the evaluation of a Bayesian Generalized Partial Credit Model (GPCM) using the `bleval` package. The model includes five latent personality traits. We illustrate the workflow from data preparation to model evaluation, including parameter estimation in CmdStan, convergence diagnostics, and computation of information criteria (DIC, WAIC, LOOIC) and marginal likelihood using the `bleval` package.
+This document demonstrates the evaluation of a Bayesian Generalized Partial Credit Model (GPCM) using the `bleval` package. The model includes five latent variables (personality traits). We illustrate the workflow from data preparation to model evaluation, including parameter estimation in CmdStan, convergence diagnostics, and computation of information criteria (DIC, WAIC, LOOIC) and fully marginal likelihood using the `bleval` package.
 
 ## Read Data
 
@@ -22,6 +22,7 @@ We begin by loading the `bleval` package and the dataset `example2_GPCM`, which 
 ```{r}
 # Install the bleval package
 devtools::install_github("luoxh3/bleval")
+
 # Load the package
 library(bleval)
 
@@ -76,28 +77,25 @@ data {
 parameters {
   vector<lower=0>[J] alpha;            // item discrimination parameters
   array[J] vector[K-1] beta;		       // item step difficulties
-  matrix[D, I] Z;		                   // std person traits
-  cholesky_factor_corr[D] L;           // Cholesky factor of correlation matrix of traits
+  corr_matrix[D] Omega;                // correlation matrix of traits
+  array[I] vector[D] theta;		         // traits
 }
 transformed parameters{
-  matrix[D, D] Omega;                  // correlation matrix of traits
-  matrix[D, I] Theta;		               // person traits
-
-  Omega = multiply_lower_tri_self_transpose(L);
-  Theta = L * Z;
+  cov_matrix[D] Sigma;                 // covariance matrix of traits
+  Sigma = quad_form_diag(Omega, rep_vector(1.0, D));
 }
 model {
   // prior
   alpha ~ lognormal(0, 1);
   for (j in 1:J)
     beta[j] ~ normal(0, 10);
-  L ~ lkj_corr_cholesky(1);
-  to_vector(Z) ~ normal(0, 1);
+  Omega ~ lkj_corr(1);
+  theta ~ multi_normal(rep_vector(0, D), Sigma);
 
   // likelihood
   for (n in 1:N)
     target += gpcm(y[n],
-      Theta[it[jj[n]], ii[n]], iw[jj[n]]*alpha[jj[n]], beta[jj[n]]);
+      theta[ii[n], it[jj[n]]], iw[jj[n]]*alpha[jj[n]], beta[jj[n]]);
 }
 "
 
@@ -135,14 +133,14 @@ fit <- stan_model$sample(
 draws <- fit$draws(format="df")
 
 # Extract posterior samples for model parameters only (excluding latent variables)
-# For the Cholesky factor of correlation matrix only the lower triangular elements are extracted
+# For the correlation matrix only the lower triangular elements are extracted
 par_cols <- grep("^alpha|^beta", names(draws), value = TRUE)
 par <- as.matrix(draws[, par_cols])
 
-L_cols <- grep("^L", names(draws), value = TRUE)
-L_lower_tri <- as.matrix(draws[, L_cols[lower.tri(diag(D))]])
+Omega_elements <- grep("^Omega", names(draws), value = TRUE)
+Omega_lower_tri <- as.matrix(draws[, Omega_elements[lower.tri(diag(D))]])
 
-samples <- cbind(par, L_lower_tri)
+samples <- cbind(par, Omega_lower_tri)
 
 # Extract posterior samples for latent variables
 lv_draws <- as.matrix(draws[, grep("^Theta", colnames(draws))])
@@ -185,20 +183,16 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   alpha <- samples_s[grep("^alpha", names(samples_s), value = TRUE)]
   beta <- matrix(samples_s[grep("^beta", names(samples_s), value = TRUE)],
                  J, K - 1)
-  L_lower_tri <- samples_s[grep("^L", names(samples_s), value = TRUE)]
-  
-  L <- matrix(0, D, D)
-  L[lower.tri(L)] <- L_lower_tri
-  for (d in 1:D) {
-    L[d, d] <- sqrt(1 - sum(L[d, 1:(d - 1)]^2))
-  }  # Obtain the Cholesky factor of correlation matrix (L) using L_lower_tri
+  Omega_lower_tri <- samples_s[grep("^Omega", names(samples_s), value = TRUE)]
+  Omega <- matrix(0, D, D)
+  Omega[lower.tri(Omega)] <- Omega_lower_tri
+  Omega <- Omega + t(Omega) + diag(D)
+
+  Mu <- rep(0, D)
+  sigma <- rep(1, D)
+  Sigma <- diag(sigma) %*% Omega %*% diag(sigma)
   
   Nnode <- nrow(nodes)
-  
-  Mu <- rep(0, D)
-  Omega <- L%*%t(L)  # Obtain the correlation matrix (Omega) using L
-  sigma <- rep(1, D)
-  Sigma <- diag(sigma)%*%Omega%*%diag(sigma)
   
   log_con_i_j <- apply(jj_i, 1, function(j){
     int <- cumsum(c(0, -beta[j,]))
@@ -229,7 +223,7 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
 # Create lists to store posterior means and covariance matrices of latent traits
 lv_list <- list()
 for (i in 1:I){
-  lv_list[[i]] <- lv_draws[ ,((i-1)*D+1):(i*D)]
+  lv_list[[i]] <- lv_draws[ ,seq(i, (i + (D-1)*I), I)]
 }
 
 # Compute the posterior means of the latent traits for unit i
@@ -241,25 +235,25 @@ lv_cov_list <- lapply(lv_list, cov)
 data_list$N <- data_list$I
 ```
 
-**Step 3: Compute the log-likelihood with latent variables integrated out**
+**Step 3: Compute the log marginal likelihood integrating out latent variables**
 
-The `log_lik` function from the `bleval` package computes the log likelihood by integrating out the latent variables using adaptive Gauss-Hermite quadrature.
+The `log_marglik` function from the `bleval` package computes the log marginal likelihood by integrating out the latent variables using adaptive Gauss-Hermite quadrature.
 
 ```{r}
-log_lik_result <- bleval::log_lik(samples = samples, data = data_list, Ngrid = 3,
-                                  lv_mu = lv_mu_list, lv_cov = lv_cov_list,
-                                  log_joint_i = log_joint_i, n_cores = 50)
+log_marglik_result <- bleval::log_marglik(samples = samples, data = data_list, Ngrid = 3,
+                                          lv_mu = lv_mu_list, lv_cov = lv_cov_list,
+                                          log_joint_i = log_joint_i, n_cores = 50)
 ```
 
 **Step 4: Compute information criteria**
 
-The `calc_IC` function from the `bleval` package computes the information criteria (DIC, WAIC, and LOOIC) based on the log-likelihoods obtained from the `log_lik` function.
+The `calc_IC` function from the `bleval` package computes the information criteria (DIC, WAIC, and LOOIC) based on the log marginal likelihoods obtained from the `log_marglik` function.
 
 ```{r}
-bleval::calc_IC(log_lik_result, 1)
+bleval::calc_IC(log_marglik_result, 1)
 ```
 
-### Compute Marginal Likelihood
+### Compute Fully Marginal Likelihood
 
 **Step 1: Specify the `log_prior` function**
 
@@ -270,41 +264,70 @@ log_prior <- function(samples_s) {
   
   alpha <- samples_s[grep("^alpha", names(samples_s), value = TRUE)]
   beta <- samples_s[grep("^beta", names(samples_s), value = TRUE)]
-  L_lower_tri <- samples_s[grep("^L", names(samples_s), value = TRUE)]
 
   D <- 5
-  L <- matrix(0, D, D)
-  L[lower.tri(L)] <- L_lower_tri
-  for (d in 1:D) {
-    L[d, d] <- sqrt(1 - sum(L[d, 1:(d-1)]^2))
-  }  # Obtain the Cholesky factor of correlation matrix (L) using L_lower_tri
+  Omega_lower_tri <- samples_s[grep("^Omega", names(samples_s), value = TRUE)]
+  Omega <- matrix(0, D, D)
+  Omega[lower.tri(Omega)] <- Omega_lower_tri
+  Omega <- Omega + t(Omega) + diag(D)
 
-  lkj_corr_cholesky_lpdf <- function(L, eta) {
-    D <- nrow(L)
-    if (D <= 1) return(0)
-    log_prob <- 0
-    for (k in 1:(D - 1)) {
-      log_prob <- log_prob + (2*eta - 2 + (D - 1 - k)) * log(L[k, k])
+  do_lkj_constant <- function(eta, K) {
+    Km1 <- K - 1
+    if (eta == 1) {
+      denominator_length <- floor(Km1 / 2)
+      denominator <- numeric(denominator_length)
+      for (k in 1:denominator_length) {
+        denominator[k] <- lgamma(2 * k)
+      }
+      constant <- -sum(denominator)
+      
+      if (K %% 2 == 1) {
+        term1 <- 0.25 * (K^2 - 1) * log(pi)
+        term2 <- 0.25 * (Km1^2) * log(2)
+        term3 <- Km1 * lgamma(0.5 * (K + 1))
+        constant <- constant - (term1 - term2 - term3)
+      } else {
+        term1 <- 0.25 * K * (K - 2) * log(pi)
+        term2 <- 0.25 * (3*K^2 - 4*K) * log(2)
+        term3 <- K * lgamma(0.5 * K)
+        term4 <- Km1 * lgamma(K)
+        constant <- constant - (term1 + term2 + term3 - term4)
+      }
+    } else {
+      constant <- Km1 * lgamma(eta + 0.5 * Km1)
+      for (k in 1:Km1) {
+        term1 <- 0.5 * k * log(pi)
+        term2 <- lgamma(eta + 0.5 * (Km1 - k))
+        constant <- constant - (term1 + term2)
+      }
     }
-
-    constant <- 0
-    for (k in 1:(D - 1)) {
-      a <- eta + 0.5 * (D - k - 1)
-      term <- (D - k - 1)*log(2) + 2*lgamma(a) - lgamma(2*a)
-      constant <- constant + term
-    }
-    log_prob - constant
+    return(constant)
   }
 
+  lkj_corr_lpdf <- function(y, eta) {
+    K <- nrow(y)
+
+    constant <- do_lkj_constant(eta, K)
+    
+    if (eta == 1) return(constant)
+
+    # sum_values = log(det(y))
+    sum_values <- determinant(y, logarithm=TRUE)$modulus[1]
+  
+    # lpdf = normalizing constant + (eta-1)*log(det(y))
+    lp <- constant + (eta - 1) * sum_values
+    return(lp)
+  } # obtain the log probability density of LKJ correlation distribution
+
   sum(dlnorm(alpha, meanlog = 0, sdlog = 1, log = TRUE)) +
-  sum(dnorm(beta, mean = 0, sd = 10, log = TRUE)) +
-  lkj_corr_cholesky_lpdf(L, eta = 1)
+    sum(dnorm(beta, mean = 0, sd = 10, log = TRUE)) +
+    lkj_corr_lpdf(Omega, eta = 1)
 }
 ```
 
 **Step 2: Define parameter bounds**
 
-The `log_marg_lik` function requires lower and upper bounds for the model parameters.
+The `log_fmarglik` function requires lower and upper bounds for the model parameters.
 
 ```{r}
 lb <- c(rep(0, J), rep(-Inf, J*(K-1)), rep(-Inf, ncol(L_lower_tri)))
@@ -313,15 +336,18 @@ ub <- c(rep(Inf, J), rep(Inf, J*(K-1)), rep(Inf, ncol(L_lower_tri)))
 names(lb) <- names(ub) <- colnames(samples)
 ```
 
-**Step 3: Compute the log marginal likelihood with both latent variables and model parameters integrated out**
+**Step 3: Compute the log fully marginal likelihood integrating out both latent variables and model parameters**
 
-The `log_marg_lik` function from the `bleval` package computes the log marginal likelihood by integrating out both the latent variables and the model parameters.
+The `log_fmarglik` function from the `bleval` package computes the log fully marginal likelihood by integrating out both the latent variables and the model parameters.
 
 ```{r}
-bleval::log_marg_lik(samples = samples, data = data_list, Ngrid = 3, 
+bleval::log_fmarglik(samples = samples, data = data_list, Ngrid = 3, 
                      lv_mu = lv_mu_list, lv_cov = lv_cov_list, 
                      log_joint_i = log_joint_i, log_prior = log_prior, 
-                     lb = lb, ub = ub)
+                     lb = lb, ub = ub,
+                     cores = 50  # the number of cores used for evaluating log_posterior
+                     # an argument passed to the function bridge_sampler()
+                     )
 ```
 
-The output of this function is the log marginal likelihood, which can be used to compute Bayes factors for model comparison.
+The output of this function is the log fully marginal likelihood, which can be used to compute Bayes factors for model comparison.

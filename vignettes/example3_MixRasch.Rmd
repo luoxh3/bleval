@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 
 ## Introduction
 
-This document demonstrates the evaluation of a Bayesian mixture Rasch Model using the `bleval` package. The model includes a latent ability (writing knowledge) and a latent class variable. We illustrate the workflow from data preparation to model evaluation, including parameter estimation in CmdStan, convergence diagnostics, and computation of information criteria (DIC, WAIC, LOOIC) and marginal likelihood using the `bleval` package.
+This document demonstrates the evaluation of a Bayesian mixture Rasch Model using the `bleval` package. The model includes a latent ability (writing knowledge) and a latent class variable. We illustrate the workflow from data preparation to model evaluation, including parameter estimation in CmdStan, convergence diagnostics, and computation of information criteria (DIC, WAIC, LOOIC) and fully marginal likelihood using the `bleval` package.
 
 ## Read Data
 
@@ -22,6 +22,7 @@ We begin by loading the `bleval` package and the dataset `example3_MixRasch`, wh
 ```{r}
 # Install the bleval package
 devtools::install_github("luoxh3/bleval")
+
 # Load the package
 library(bleval)
 
@@ -205,25 +206,25 @@ lv_cov_list <- lapply(lv_list, var)
 data_list$N <- data_list$I
 ```
 
-**Step 3: Compute the log-likelihood with latent variables integrated out**
+**Step 3: Compute the log marginal likelihood integrating out latent variables**
 
-The `log_lik` function from the `bleval` package computes the log likelihood by integrating out the latent variables using adaptive Gauss-Hermite quadrature.
+The `log_marglik` function from the `bleval` package computes the log marginal likelihood by integrating out the latent variables using adaptive Gauss-Hermite quadrature.
 
 ```{r}
-log_lik_result <- bleval::log_lik(samples = samples, data = data_list, Ngrid = 5,
-                                  lv_mu = lv_mu_list, lv_cov = lv_cov_list,
-                                  log_joint_i = log_joint_i, n_cores = 10)
+log_marglik_result <- bleval::log_marglik(samples = samples, data = data_list, Ngrid = 5,
+                                          lv_mu = lv_mu_list, lv_cov = lv_cov_list,
+                                          log_joint_i = log_joint_i, n_cores = 10)
 ```
 
 **Step 4: Compute information criteria**
 
-The `calc_IC` function from the `bleval` package computes the information criteria (DIC, WAIC, and LOOIC) based on the log-likelihoods obtained from the `log_lik` function.
+The `calc_IC` function from the `bleval` package computes the information criteria (DIC, WAIC, and LOOIC) based on the log marginal likelihoods obtained from the `log_marglik` function.
 
 ```{r}
 bleval::calc_IC(log_lik_result, 1)
 ```
 
-### Compute Marginal Likelihood
+### Compute Fully Marginal Likelihood
 
 **Step 1: Specify the `log_prior` function**
 
@@ -236,14 +237,14 @@ log_prior <- function(samples_s) {
   sigma <- samples_s[grep("sigma",names(samples_s))]
   
   log(2) + sum(dgamma(lambda, shape = 0.5, rate = 1, log = TRUE)) +
-  sum(dnorm(beta, mean = 0, sd = 1, log = TRUE)) +
-  sum(log(truncdist::dtrunc(sigma, "norm", a = 0, b = Inf, mean = 0, sd = 5)))
+   sum(dnorm(beta, mean = 0, sd = 1, log = TRUE)) +
+   sum(log(truncdist::dtrunc(sigma, "norm", a = 0, b = Inf, mean = 0, sd = 5)))
 }
 ```
 
 **Step 2: Define parameter bounds**
 
-The `log_marg_lik` function requires lower and upper bounds for the model parameters.
+The `log_fmarglik` function requires lower and upper bounds for the model parameters.
 
 ```{r}
 lb <- c(rep(0, 2), rep(-Inf, 14), rep(0, 2))
@@ -252,15 +253,16 @@ ub <- c(rep(Inf, 2), rep(Inf, 14), rep(Inf, 2))
 names(lb) <- names(ub) <- colnames(samples)
 ```
 
-**Step 3: Compute the log marginal likelihood integrating out both latent variables and model parameters**
+**Step 3: Compute the log fully marginal likelihood integrating out both latent variables and model parameters**
 
-The `log_marg_lik` function from the `bleval` package computes the log marginal likelihood by integrating out both the latent variables and the model parameters.
+The `log_fmarglik` function from the `bleval` package computes the log fully marginal likelihood by integrating out both the latent variables and the model parameters.
 
 ```{r}
-bleval::log_marg_lik(samples = samples, data = data_list, Ngrid = 5, 
+bleval::log_fmarglik(samples = samples, data = data_list, Ngrid = 5, 
                      lv_mu = lv_mu_list, lv_cov = lv_cov_list, 
                      log_joint_i = log_joint_i, log_prior = log_prior, 
                      lb = lb, ub = ub)
 ```
 
-The output of this function is the log marginal likelihood, which can be used to compute Bayes factors for model comparison.
+The output of this function is the log fully marginal likelihood, which can be used to compute Bayes factors for model comparison.
+
