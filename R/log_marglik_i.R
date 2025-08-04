@@ -24,6 +24,7 @@
 #'    - `i`: The index of the unit.
 #'    - `Ngrid`: Number of grid points (quadrature nodes) per dimension.
 #'    - `nodes`: A matrix of quadrature nodes transformed using the latent variable mean and covariance.
+#' @param ... Additional arguments to the log_joint_i function.
 #'
 #' @returns The log marginal likelihood for unit i.
 #'
@@ -32,7 +33,7 @@
 #'
 #' @export
 #'
-log_marglik_i <- function(samples_s, data, i, Ngrid, lv_mu, lv_cov, log_joint_i) {
+log_marglik_i <- function(samples_s, data, i, Ngrid, lv_mu, lv_cov, log_joint_i, ...) {
 
   # Extract the posterior mean and covariance matrix for the latent variable for unit i
   lv_mu_i <- lv_mu[[i]]
@@ -47,13 +48,15 @@ log_marglik_i <- function(samples_s, data, i, Ngrid, lv_mu, lv_cov, log_joint_i)
 
   # Handle the case when Ndim = 1 (univariate latent variable)
   if (Ndim == 1) {
+    lv_mu_i <- as.numeric(lv_mu_i)
+    lv_cov_i <- as.numeric(lv_cov_i)
 
     # Compute log of the standard normal density for each quadrature point
     # Adjust by the standard deviation (sqrt of variance) for the unit i
     log_std_i <- t( dnorm(nodes_Ndim, mean = 0, sd = 1, log = TRUE) - log(sqrt(lv_cov_i)) )
 
     # Transform quadrature nodes using the latent variable mean and standard deviation
-    nodes <- t(apply(nodes_Ndim, 1, function(z) lv_mu_i + sqrt(lv_cov_i) * z))
+    nodes <- lv_mu_i + sqrt(lv_cov_i) * nodes_Ndim
 
   } else {
 
@@ -71,7 +74,7 @@ log_marglik_i <- function(samples_s, data, i, Ngrid, lv_mu, lv_cov, log_joint_i)
   }
 
   # Compute the log joint density for unit i using the transformed nodes
-  log_joint_i_result <- log_joint_i(samples_s, data, i, Ngrid, nodes)
+  log_joint_i_result <- log_joint_i(samples_s, data, i, Ngrid, nodes, ...)
 
   # Compute the log marginal likelihood for unit i by summing over the quadrature points
   matrixStats::logSumExp(log_weights_Ndim - log_std_i + log_joint_i_result)
