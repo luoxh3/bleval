@@ -29,6 +29,7 @@
 #' @param parallel A logical indicating whether to compute in parallel (default is TRUE).
 #' @param n_cores Number of cores to use for parallel computation. Defaults to `detectCores() - 2`.
 #' @param packages A character vector of package names to be loaded in the parallel environment.
+#' @param ... Additional arguments to the log_joint_i function.
 #'
 #' @return A list containing two elements:
 #'    \item{log_marglik_point}{A matrix of log marginal likelihoods for each data point.
@@ -53,7 +54,7 @@
 #'
 log_marglik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
                     parallel = TRUE, n_cores = detectCores() - 2,
-                    packages = c("matrixStats", "statmod", "mvtnorm", "extraDistr","truncdist")) {
+                    packages = c("matrixStats", "statmod", "mvtnorm", "extraDistr","truncdist"), ...) {
 
   ## log marginal likelihood for each point ------------------------------------
 
@@ -94,7 +95,7 @@ log_marglik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
                                             "log_joint_i")) %dopar% {
                                   sapply(1:data$N, function(i) {
                                     bleval::log_marglik_i(samples[j, ], data, i, Ngrid,
-                                                          lv_mu, lv_cov, log_joint_i)
+                                                          lv_mu, lv_cov, log_joint_i, ...)
                                   })
                                 }
     stopCluster(cl)
@@ -106,7 +107,7 @@ log_marglik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
     for (j in 1:nrow(samples)) {
       for (i in 1:data$N) {
         log_marglik_point[j, i] <- bleval::log_marglik_i(samples[j, ], data, i, Ngrid,
-                                                         lv_mu, lv_cov, log_joint_i)
+                                                         lv_mu, lv_cov, log_joint_i, ...)
       }
     }
   }
@@ -117,7 +118,7 @@ log_marglik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
   log_marglik_postmean <- numeric(data$N)
   for (i in 1:data$N) {
     log_marglik_postmean[i] <- bleval::log_marglik_i(samps2_thin_mean, data, i, Ngrid,
-                                                     lv_mu, lv_cov, log_joint_i)
+                                                     lv_mu, lv_cov, log_joint_i, ...)
   }
 
   # Return a list containing log_marglik_point and log_marglik_postmean
