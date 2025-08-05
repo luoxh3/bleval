@@ -35,7 +35,7 @@
 #' @param ub A named vector with upper bounds for parameters. This is required for
 #'    the \code{\link[bridgesampling]{bridge_sampler}} function and defines the
 #'    maximum value for the parameter space over which the fully marginal likelihood is computed.
-#' @param ... Additional arguments passed directly to the `bridge_sampler` function.
+#' @param ... Additional arguments passed directly to the `bridge_sampler` function, which can also be passed to the `log_joint_i` function.
 #'
 #' @return A list containing the result of the bridge sampling, which includes the log fully marginal
 #'    likelihood estimate and other information related to the bridge sampling process.
@@ -65,7 +65,7 @@ log_fmarglik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
 
   # Define log_posterior function for bridge_sampler ---------------------------
   # Note: use closure to capture lv_mu, lv_cov, Ngrid and log_joint_i
-  log_posterior <- function(samples_s, data) {
+  log_posterior <- function(samples_s, data, ...) {
 
     N <- data$N
     log_marglik_i_all <- numeric(N)
@@ -73,7 +73,7 @@ log_fmarglik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
       # Compute log marginal likelihood for each unit
       # passing lv_mu, lv_cov and Ngrid explicitly
       log_marglik_i_all[i] <- bleval::log_marglik_i(samples_s, data, i, Ngrid,
-                                                    lv_mu, lv_cov, log_joint_i)
+                                                    lv_mu, lv_cov, log_joint_i, ...)
     }
     # Return the sum of the log marginal likelihoods and the log prior density
     sum(log_marglik_i_all) + log_prior(samples_s)
