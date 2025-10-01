@@ -34,7 +34,7 @@ The workflow of the `bleval` package is illustrated in the figure below:
 
 If you use the `bleval` package in your research, please cite it as follows:
 
-Luo, X., Dong, J., Liu, H., & Liu, Y. (in preparation). Bayesian Evaluation of Latent Variable Models: A Practical Tutorial with the R Package *bleval*. *Journal*, *XX*(X), XXX-XXX.\
+Luo, X., Dong, J., Liu, H., & Liu, Y. (in preparation). Bayesian Model Comparison for Latent Variable Models: A Tutorial on Computing Information Criteria and Bayes Factors with the R Package *bleval*. *Journal*, *XX*(X), XXX-XXX.\
 DOI: [...]
 
 ------------------------------------------------------------------------
@@ -112,7 +112,6 @@ model_string <- "
     }
     # priors ---------------------------------
     y_pre ~ dgamma(0.001, 0.001)
-    log_pre <- log(y_pre)
     beta[1] ~ dnorm(0, 0.01)
     beta[2] ~ dnorm(0, 0.01)
     beta_0 <- beta[1]
@@ -160,6 +159,8 @@ dim(samps2)
 
 We now evaluate the model using the `bleval` package step by step.
 
+Note: The `bleval` package provides a powerful and flexible framework for Bayesian evaluation of latent variable models. While specifying the custom functions requires care, this approach gives you full control over the model evaluation process and ensures that latent variables are properly accounted for in your model comparisons.
+
 #### 🎯 Compute Information Criteria
 
 **Step 1: Specify the `log_joint_i` function**
@@ -172,37 +173,87 @@ The `log_joint_i` function calculates the log joint density for each unit. This 
 -   `Ngrid`: The number of quadrature nodes per latent variable.
 -   `nodes`: A matrix of latent variable values transformed from the quadrature nodes (output of the `get_quadrature` function).
 
+**💡 Tips for Writing `log_joint_i`:**
+
+-   **Understanding the components**:
+    -   Conditional likelihood p(y_j \| η_j, θ): the probability of observed data for unit j given latent variables and parameters
+    -   Latent variable density p(η_j \| θ): the density of latent variables
+    -   The function should return: log p(y_j \| η_j, θ) + log p(η_j \| θ)
+-   **Use the "\~" Heuristic**: Inspect your JAGS model and identify all lines with "\~" symbols. For `log_joint_i`, focus on the lines corresponding to:
+    -   Observations given latent variables (conditional likelihood): `y ~ distribution(...)`
+    -   Latent variables given parameters: `latent_variable ~ distribution(...)` The log of the densities on the right-hand side of these "\~" symbols needs to be evaluated and summed
+-   **Map to Model Specification**: Write down your model mathematically first, then translate each component to code
+-   **Check Dimensions**: Ensure all matrices and vectors have compatible dimensions
+-   **Use Log-Scale**: Always work on log-scale for numerical stability
+-   **Test with Simple Cases**: Verify your function works for a single posterior sample and unit
+
 ```{r}
 log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
-  # Extract data for unit i
-  Nobs <- data$Nobs
-  Nnum <- data$N
-  Tnum <- Nobs / Nnum
-  y_i <- data$y[((i-1)*Tnum+1):(i*Tnum)]
-  x_i <- data$x[((i-1)*Tnum+1):(i*Tnum)]
+  # ==================================================
+  # STEP 1: Extract data for the current unit i
+  # ==================================================
+  # In MLM context: i represents a level-2 unit (e.g., school, person)
+  Nobs <- data$Nobs    # Total number of observations
+  Nnum <- data$N       # Number of level-2 units
+  Tnum <- Nobs / Nnum  # Number of the observations per unit
   
-  # Expand x and y values for quadrature grid
+  # Extract observations for unit i
+  y_i <- data$y[((i-1)*Tnum+1):(i*Tnum)]  # Outcome values for unit i
+  x_i <- data$x[((i-1)*Tnum+1):(i*Tnum)]  # Predictor values for unit i
+  
+  # ==================================================
+  # STEP 2: Prepare data structures for quadrature
+  # ==================================================
+  # The 'nodes' matrix contains quadrature points for latent variables
+  # Each row represents one combination of latent variable values
+  # For 2 latent variables with Ngrid = 9: nodes has 81 rows, 2 columns
+  
+  # Expand x and y to match the quadrature grid dimensions
   x_i_extended_mat <- matrix(rep(x_i, times = Ngrid * Ngrid), 
                              nrow = Ngrid * Ngrid, byrow = TRUE)
   y_i_extended_mat <- matrix(rep(y_i, times = Ngrid * Ngrid), 
                              nrow = Ngrid * Ngrid, byrow = TRUE)
   
-  # Compute log conditional likelihood for each unit
+  # ==================================================
+  # STEP 3: Compute log conditional likelihood
+  # ==================================================
+  # This corresponds to: log p(y_j | η_j, θ)
+  # In this Gaussian linear mixed model: y_it ~ N(μ_i + φ_i * x_it, σ²)
+  
+  # Compute predicted values for each quadrature point
+  # nodes[,1] = random intercept values, nodes[,2] = random slope values
   predicted_y <- nodes[, 1] + nodes[, 2] * x_i_extended_mat
+  
+  # Compute log-density for each observation at each quadrature point
   log_con_t_i <- dnorm(y_i_extended_mat, mean = predicted_y, 
                        sd = 1 / sqrt(samples_s[["y_pre"]]), log = TRUE)
+  
+  # Sum over observations within the unit (conditional independence)
   log_con_i <- rowSums(log_con_t_i)
   
-  # Compute log prior density for latent variables (random effects)
-  sd_mu <- sqrt(1 / samples_s[["tau_beta_0"]])
-  sd_phi <- sqrt(1 / samples_s[["tau_beta_1"]])
-  mean <- c(samples_s[["beta_0"]], samples_s[["beta_1"]])
+  # ==================================================
+  # STEP 4: Compute log prior density for latent variables
+  # ==================================================
+  # This corresponds to: log p(η_j | θ)
+  # In this Gaussian linear mixed model: random effects ~ MVN(β, G)
+  
+  # Extract parameters for the random effects distribution
+  sd_mu <- sqrt(1 / samples_s[["tau_beta_0"]])   # SD for random intercept
+  sd_phi <- sqrt(1 / samples_s[["tau_beta_1"]])  # SD for random slope
+  mean <- c(samples_s[["beta_0"]], samples_s[["beta_1"]])  # Fixed effects
+  
+  # Construct covariance matrix for random effects
   sigma <- matrix(c(sd_mu^2, sd_mu * samples_s[["rho"]] * sd_phi,
                     sd_mu * samples_s[["rho"]] * sd_phi, sd_phi^2), nrow = 2)
+  
+  # Compute multivariate normal log-density for random effects
   log_raneff_i <- mvtnorm::dmvnorm(nodes, mean, sigma, log = TRUE)
   
-  # Return the log joint density for each unit
-  log_raneff_i + log_con_i
+  # ==================================================
+  # STEP 5: Return the log joint density for each unit
+  # ==================================================
+  # This equals: log p(y_j | η_j, θ) + log p(η_j | θ)
+  log_con_i + log_raneff_i
 }
 ```
 
@@ -275,8 +326,30 @@ The `log_prior` function calculates the log prior density for model parameters. 
 -   Normal priors for the fixed effects.
 -   A uniform prior for the correlation parameter.
 
+**💡 Tips for Writing `log_prior`:**
+
+-   **One-to-One Translation**: Each prior in your JAGS/Stan model becomes one line in this function
+-   **Use the "\~" Heuristic**: Inspect your JAGS model and identify all lines with "\~" symbols. For `log_prior`, focus on the lines like:
+    -   `parameter ~ prior_distribution(...)` The log of the densities on the right-hand side of these "\~" symbols needs to be evaluated and summed
+-   **Parameterization Check**: Ensure R density functions use the same parameterization as your Bayesian software
+-   **Use Log-Scale**: Remember to use log = TRUE in all density functions
+
 ```{r}
 log_prior <- function(samples_s) {
+  # ==================================================
+  # Translate JAGS priors to R density functions:
+  # 
+  # JAGS: y_pre ~ dgamma(0.001, 0.001)
+  # R:    dgamma(y_pre, shape = 0.001, rate = 0.001, log = TRUE)
+  #
+  # JAGS: beta_0 ~ dnorm(0, 0.01)
+  # R:    dnorm(beta_0, mean = 0, sd = sqrt(1/0.01), log = TRUE)
+  #
+  # JAGS: rho ~ dunif(-1, 1)
+  # R:    dunif(rho, min = -1, max = 1, log = TRUE)
+  # ==================================================
+  
+  # Sum all log-prior densities (independent priors)
   dgamma(samples_s[["y_pre"]], shape = 0.001, rate = 0.001, log = TRUE) +
   dnorm(samples_s[["beta_0"]], mean = 0, sd = sqrt(1/0.01), log = TRUE) +
   dnorm(samples_s[["beta_1"]], mean = 0, sd = sqrt(1/0.01), log = TRUE) +
@@ -291,6 +364,11 @@ log_prior <- function(samples_s) {
 The `log_fmarglik` function requires lower and upper bounds for the model parameters. These bounds ensure that the parameter values remain within their valid ranges during the computation of the fully marginal likelihood.
 
 ```{r}
+# Define bounds based on parameter constraints:
+# - beta_0, beta_1: unbounded (-Inf to Inf)
+# - y_pre, tau_beta_0, tau_beta_1: precision parameters, must be positive (0 to Inf)
+# - rho: correlation, bounded between -1 and 1
+
 lb <- c(rep(-Inf, 2), rep(0, 3), -1)
 ub <- c(rep(Inf, 2), rep(Inf, 3), 1)
 names(lb) <- pars_vector
