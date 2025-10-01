@@ -1,9 +1,3 @@
----
-output:
-  pdf_document: default
-  html_document: default
----
-
 # bleval: Bayesian Evaluation for Latent Variable Models
 
 ## 🔍 Overview
@@ -167,9 +161,9 @@ We now evaluate the model using the `bleval` package step by step.
 
 Note: The `bleval` package provides a powerful and flexible framework for Bayesian evaluation of latent variable models. While specifying the custom functions requires care, this approach gives you full control over the model evaluation process and ensures that latent variables are properly accounted for in your model comparisons.
 
-### 🎯 3.1 Compute Information Criteria
+## 🎯 3.1 Compute Information Criteria
 
-#### 1️⃣ Step 1: Specify the `log_joint_i` function
+### 1️⃣ Step 1: Specify the `log_joint_i` function
 
 The `log_joint_i` function calculates the log joint density for each unit. This function takes the following inputs:
 
@@ -263,7 +257,7 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
 }
 ```
 
-#### 2️⃣ Step 2: Compute the posterior means and covariance matrices of latent variables
+### 2️⃣ Step 2: Compute the posterior means and covariance matrices of latent variables
 
 These values are used to adapt the quadrature nodes and weights in the adaptive Gauss-Hermite quadrature.
 
@@ -283,7 +277,7 @@ for (i in 1:Nnum) {
 }
 ```
 
-#### 3️⃣ Step 3: Compute the log marginal likelihood integrating out latent variables\*\*
+### 3️⃣ Step 3: Compute the log marginal likelihood
 
 The `log_marglik` function from the `bleval` package computes the log marginal likelihood by integrating out the latent variables using adaptive Gauss-Hermite quadrature. This function requires the following inputs:
 
@@ -305,7 +299,7 @@ The output of this function is a list containing two objects:
 -   log_marglik_point: A matrix of log marginal likelihoods for each data point.
 -   log_marglik_postmean: A vector of log marginal likelihoods computed using the point estimates (posterior means) of the model parameters.
 
-#### 4️⃣ Step 4: Compute information criteria
+### 4️⃣ Step 4: Compute information criteria
 
 The `calc_IC` function from the `bleval` package computes the information criteria (DIC, WAIC, and LOOIC) based on the log marginal likelihoods obtained from the `log_marglik` function. This function requires the following inputs:
 
@@ -322,9 +316,9 @@ The output of this function includes the following information criteria:
 -   WAIC: Watanabe-Akaike Information Criterion
 -   LOOIC: Leave-One-Out Information Criterion
 
-### 🎯 3.2 Compute Fully Marginal Likelihood
+## 🎯 3.2 Compute Fully Marginal Likelihood
 
-#### 1️⃣ Step 1: Specify the `log_prior` function
+### 1️⃣ Step 1: Specify the `log_prior` function
 
 The `log_prior` function calculates the log prior density for model parameters. This function takes a named vector of parameter values from a posterior sample and returns the log prior density for each parameter. The priors used in this example include:
 
@@ -365,7 +359,7 @@ log_prior <- function(samples_s) {
 }
 ```
 
-#### 2️⃣ Step 2: Define parameter bounds
+### 2️⃣ Step 2: Define parameter bounds
 
 The `log_fmarglik` function requires lower and upper bounds for the model parameters. These bounds ensure that the parameter values remain within their valid ranges during the computation of the fully marginal likelihood.
 
@@ -381,7 +375,7 @@ names(lb) <- pars_vector
 names(ub) <- pars_vector # c("beta_0", "beta_1", "y_pre", "tau_beta_0", "tau_beta_1", "rho")
 ```
 
-#### 3️⃣ Step 3: Compute the log fully marginal likelihood integrating out both latent variables and model parameters
+### 3️⃣ Step 3: Compute the log fully marginal likelihood
 
 The `log_fmarglik` function from the `bleval` package computes the log fully marginal likelihood by integrating out both the latent variables and the model parameters. This function requires the following inputs:
 
