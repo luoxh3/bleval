@@ -15,6 +15,20 @@ With user-friendly functions and step-by-step guidance, bleval facilitates the p
 
 ------------------------------------------------------------------------
 
+## 📑 Table of Contents
+
+-   [Overview](#-overview)
+-   [Workflow](#-workflow)
+-   [Citation](#-citation)
+-   [Installation](#-installation)
+-   [Model Examples Overview](#-model-examples-overview)
+-   [Example: Evaluating a Gaussian Linear Mixed Model](#-example-evaluating-a-gaussian-linear-mixed-model)
+    -   [Data Generation](#-1-data-generation)
+    -   [Parameter Estimation in JAGS](#-2-parameter-estimation-in-jags)
+    -   [Model Evaluation with bleval](#-3-model-evaluation-with-bleval)
+
+------------------------------------------------------------------------
+
 ## 🧊️ Workflow
 
 The workflow of the `bleval` package is illustrated in the figure below:
@@ -53,11 +67,32 @@ devtools::install_github("luoxh3/bleval")
 
 ------------------------------------------------------------------------
 
-## 📊 Example: Evaluating a Gaussian Linear Mixed Model
+## 📁 Model Examples Overview
+
+The `bleval` package provides a flexible framework for Bayesian evaluation of various latent variable models. While the package can be adapted to many model types, we demonstrate its application through several representative examples across three main categories: Structural Equation Models (SEM), Multilevel Models (MLM), and Item Response Theory (IRT) models. The table below summarizes these illustrative examples with their key characteristics.
+
+| Model Category and Specification | Number of Latent Variables | Marginal Likelihood Tractability | Vignette File Name |
+|------------------|------------------|-------------------|------------------|
+| SEM: Confirmatory Factor Analysis (CFA) | 1 | Yes | `vignettes/SEM_CFA.R` |
+| SEM: Latent Variable Mediation | 3 | Yes | `vignettes/SEM_mediation.R` |
+| SEM: Latent Variable Moderation (with product terms) | 3 | No | `vignettes/SEM_moderation.Rmd` |
+| MLM: Gaussian Linear Mixed Model (random intercept + slope) | 2 | Yes | `vignettes/MLM_linear_mixed.Rmd` |
+| MLM: Location-Scale Model (random effects for both mean and variance) | 4 | No | `vignettes/MLM_location_scale.R` |
+| IRT: Unidimensional 2PL (dichotomous responses) | 1 | No | `vignettes/IRT_2PL.R` |
+| IRT: Unidimensional GPCM (ordinal responses) | 1 | No | `vignettes/IRT_GPCM.R` |
+| IRT: Unidimensional GRM (ordinal responses) | 1 | No | `vignettes/IRT_GRM.R` |
+| IRT: Multidimensional GPCM (5 dimensions) | 5 | No | `vignettes/IRT_MGPCM.Rmd` |
+| IRT: Mixture Rasch Model | 2 | No | `vignettes/IRT_mixture_Rasch.Rmd` |
+
+Each vignette provides a complete workflow for model evaluation using the `bleval` package. Note that while some examples include data generation steps using simulated data, others begin with parameter estimation using empirical datasets. All examples demonstrate the full model evaluation pipeline including computation of information criteria (DIC, WAIC, LOOIC) and fully marginal likelihoods.
+
+------------------------------------------------------------------------
+
+## 📋 Example: Evaluating a Gaussian Linear Mixed Model
 
 This guide demonstrates how to use the `bleval` package to evaluate a Bayesian Gaussian linear mixed model with a random intercept and a random slope. The example is based on a simulated dataset.
 
-Note: For more detailed examples of using the `bleval` package with **multilevel models (MLM)**, **structural equation models (SEM)**, and **item response theory (IRT) models** (based on empirical data), please refer to the vignette.
+Note: For more detailed examples of using the `bleval` package with **multilevel models (MLM)**, **structural equation models (SEM)**, and **item response theory (IRT) models** (based on both simulated and empirical data), please refer to the vignette files listed in the [Model Examples Overview](#-model-examples-overview) section.
 
 ## 🎯 1 Data Generation
 
@@ -173,15 +208,15 @@ The `log_joint_i` function calculates the log joint density for each unit. This 
 -   `Ngrid`: The number of quadrature nodes per latent variable.
 -   `nodes`: A matrix of latent variable values transformed from the quadrature nodes (output of the `get_quadrature` function).
 
-**💡 Tips for Writing `log_joint_i`:**
+#### 💡 Tips for Writing `log_joint_i`
 
 -   **Understanding the components**:
     -   Conditional likelihood p(y_j \| η_j, θ): the probability of observed data for unit j given latent variables and parameters
     -   Latent variable density p(η_j \| θ): the density of latent variables
     -   The function should return: log p(y_j \| η_j, θ) + log p(η_j \| θ)
--   **Use the "\~" Heuristic**: Inspect your JAGS model and identify all lines with "\~" symbols. For `log_joint_i`, focus on the lines corresponding to:
+-   **Use the "\~" Heuristic**: Inspect your JAGS model and identify all lines with "\~" symbols. The log of the densities on the right-hand side of these "\~" symbols needs to be evaluated and summed. For `log_joint_i`, focus on the lines corresponding to:
     -   Observations given latent variables (conditional likelihood): `y ~ distribution(...)`
-    -   Latent variables given parameters: `latent_variable ~ distribution(...)` The log of the densities on the right-hand side of these "\~" symbols needs to be evaluated and summed
+    -   Latent variables given parameters: `latent_variable ~ distribution(...)`
 -   **Map to Model Specification**: Write down your model mathematically first, then translate each component to code
 -   **Check Dimensions**: Ensure all matrices and vectors have compatible dimensions
 -   **Use Log-Scale**: Always work on log-scale for numerical stability
@@ -232,7 +267,7 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   log_con_i <- rowSums(log_con_t_i)
   
   # ==================================================
-  # STEP 4: Compute log prior density for latent variables
+  # STEP 4: Compute log density for latent variables
   # ==================================================
   # This corresponds to: log p(η_j | θ)
   # In this Gaussian linear mixed model: random effects ~ MVN(β, G)
@@ -326,11 +361,11 @@ The `log_prior` function calculates the log prior density for model parameters. 
 -   Normal priors for the fixed effects.
 -   A uniform prior for the correlation parameter.
 
-**💡 Tips for Writing `log_prior`:**
+#### 💡 Tips for Writing `log_prior`
 
 -   **One-to-One Translation**: Each prior in your JAGS/Stan model becomes one line in this function
--   **Use the "\~" Heuristic**: Inspect your JAGS model and identify all lines with "\~" symbols. For `log_prior`, focus on the lines like:
-    -   `parameter ~ prior_distribution(...)` The log of the densities on the right-hand side of these "\~" symbols needs to be evaluated and summed
+-   **Use the "\~" Heuristic**: Inspect your JAGS model and identify all lines with "\~" symbols. The log of the densities on the right-hand side of these "\~" symbols needs to be evaluated and summed. For `log_prior`, focus on the lines like:
+    -   `parameter ~ prior_distribution(...)`
 -   **Parameterization Check**: Ensure R density functions use the same parameterization as your Bayesian software
 -   **Use Log-Scale**: Remember to use log = TRUE in all density functions
 

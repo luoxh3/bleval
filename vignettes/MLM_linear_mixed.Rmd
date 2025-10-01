@@ -115,19 +115,6 @@ dim(samps2)
 
 ```
 
-## Model Convergence Check
-
-We check the convergence of the MCMC chains using the Gelman-Rubin diagnostic (R-hat). A common threshold for convergence is R-hat \< 1.1.
-
-```{r}
-# Load the posterior_summary.R script to compute convergence diagnostics
-source("posterior_summary.R")
-# Summarize the posterior samples and compute the Gelman-Rubin diagnostic (R-hat)
-result <- summarize_posterior(post)
-# Compute the maximum R-hat
-max(result$RHAT)
-```
-
 ## Model Evaluation with `bleval`
 
 We now evaluate the model using the `bleval` package step by step.

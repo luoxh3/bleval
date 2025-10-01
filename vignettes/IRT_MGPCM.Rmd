@@ -146,20 +146,6 @@ samples <- cbind(par, Omega_lower_tri)
 lv_draws <- as.matrix(draws[, grep("^Theta", colnames(draws))])
 ```
 
-## Model Convergence Check
-
-We check the convergence of the MCMC chains using the Gelman-Rubin diagnostic (R-hat). A common threshold for convergence is R-hat \< 1.1.
-
-```{r}
-# Summarize the posterior samples and compute the Gelman-Rubin diagnostic (R-hat)
-summary <- fit$summary(NULL,
-                       posterior::default_summary_measures()[1:4],
-                       quantiles = ~ quantile2(., probs = c(0.025, 0.975)),
-                       posterior::default_convergence_measures())
-# Check the maximum R-hat
-max(summary[,"rhat"], na.rm = TRUE)
-```
-
 ## Model Evaluation with `bleval`
 
 ### Compute Information Criteria

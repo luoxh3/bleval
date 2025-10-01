@@ -149,19 +149,6 @@ samps2 <- as.matrix(samps[ ,pars_vector])
 dim(samps2)
 ```
 
-## Model Convergence Check
-
-We check the convergence of the MCMC chains using the Gelman-Rubin diagnostic (R-hat). A common threshold for convergence is R-hat \< 1.1.
-
-```{r}
-# Load the posterior_summary.R script to compute convergence diagnostics
-source("posterior_summary.R")
-# Summarize the posterior samples and compute the Gelman-Rubin diagnostic (R-hat)
-result <- summarize_posterior(post)
-# Exclude the fixed factor loadings and compute the maximum R-hat
-max(subset(result, !(rownames(result) %in% c("lambdaM[1]", "lambdaX[1]", "lambdaY[1]")))$RHAT)
-```
-
 ## Model Evaluation with `bleval`
 
 ### Compute Information Criteria
