@@ -56,7 +56,7 @@ log_marglik_i <- function(samples_s, data, i, Ngrid, lv_mu, lv_cov, log_joint_i,
     log_std_i <- t( dnorm(nodes_Ndim, mean = 0, sd = 1, log = TRUE) - log(sqrt(lv_cov_i)) )
 
     # Transform quadrature nodes using the latent variable mean and standard deviation
-    nodes <- t(lv_mu_i + sqrt(lv_cov_i) * nodes_Ndim)
+    nodes <- lv_mu_i + sqrt(lv_cov_i) * nodes_Ndim
 
   } else {
 
