@@ -53,7 +53,7 @@ log_marglik_i <- function(samples_s, data, i, Ngrid, lv_mu, lv_cov, log_joint_i,
 
     # Compute log of the standard normal density for each quadrature point
     # Adjust by the standard deviation (sqrt of variance) for the unit i
-    log_std_i <- t( dnorm(nodes_Ndim, mean = 0, sd = 1, log = TRUE) - log(sqrt(lv_cov_i)) )
+    log_std_i <- dnorm(nodes_Ndim, mean = 0, sd = 1, log = TRUE) - log(sqrt(lv_cov_i))
 
     # Transform quadrature nodes using the latent variable mean and standard deviation
     nodes <- lv_mu_i + sqrt(lv_cov_i) * nodes_Ndim
