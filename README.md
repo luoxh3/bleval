@@ -1,20 +1,5 @@
 # bleval: Bayesian Evaluation for Latent Variable Models
 
-## 🔍 Overview
-
-The `bleval` package provides tools for evaluating Bayesian latent variable models, such as structural equation models (SEMs), item response theory (IRT) models, and multilevel models (MLMs). It uses **adaptive Gauss-Hermite quadrature** to approximate marginal likelihoods by integrating out latent variables, supporting the computation of widely used Bayesian evaluation criteria, including:
-
--   **Deviance Information Criterion (DIC)**
--   **Watanabe-Akaike Information Criterion (WAIC)**
--   **Leave-One-Out Information Criterion (LOOIC)**
--   **Fully marginal likelihoods** for Bayes factor computation
-
-The package is particularly useful for researchers aiming to generalize their findings beyond observed units, as it emphasizes the importance of integrating out latent variables for predictive accuracy.
-
-With user-friendly functions and step-by-step guidance, bleval facilitates the practical implementation of Bayesian model evaluation, making it accessible for applied researchers in psychology and related fields.
-
-------------------------------------------------------------------------
-
 ## 📑 Table of Contents
 
 -   [Overview](#-overview)
@@ -26,6 +11,23 @@ With user-friendly functions and step-by-step guidance, bleval facilitates the p
     -   [Data Generation](#-1-data-generation)
     -   [Parameter Estimation in JAGS](#-2-parameter-estimation-in-jags)
     -   [Model Evaluation with bleval](#-3-model-evaluation-with-bleval)
+
+------------------------------------------------------------------------
+
+## 🔍 Overview
+
+The `bleval` package provides tools for evaluating Bayesian latent variable models, such as structural equation models (SEMs), item response theory (IRT) models, and multilevel models (MLMs). 
+
+It uses **adaptive Gauss-Hermite quadrature** to approximate marginal likelihoods by integrating out latent variables, supporting the computation of widely used Bayesian evaluation criteria, including:
+
+-   **Deviance Information Criterion (DIC)**
+-   **Watanabe-Akaike Information Criterion (WAIC)**
+-   **Leave-One-Out Information Criterion (LOOIC)**
+-   **Fully marginal likelihoods** for Bayes factor computation
+
+The package is particularly useful for researchers aiming to generalize their findings beyond observed units, as it emphasizes the importance of integrating out latent variables for predictive accuracy.
+
+With step-by-step guidance, bleval facilitates the practical implementation of Bayesian model evaluation, making it accessible for applied researchers in psychology and related fields.
 
 ------------------------------------------------------------------------
 
@@ -78,7 +80,7 @@ The `bleval` package provides a flexible framework for Bayesian evaluation of va
 | SEM: Latent Variable Moderation (with product terms) | 3 | No | `vignettes/SEM_moderation.Rmd` |
 | MLM: Gaussian Linear Mixed Model (random intercept + slope) | 2 | Yes | `vignettes/MLM_linear_mixed.Rmd` |
 | MLM: Location-Scale Model (random effects for both mean and variance) | 4 | No | `vignettes/MLM_location_scale.R` |
-| IRT: Unidimensional 2PL (dichotomous responses) | 1 | No | `vignettes/IRT_2PL.R` |
+| IRT: Unidimensional 2PL (binary responses) | 1 | No | `vignettes/IRT_2PL.R` |
 | IRT: Unidimensional GPCM (ordinal responses) | 1 | No | `vignettes/IRT_GPCM.R` |
 | IRT: Unidimensional GRM (ordinal responses) | 1 | No | `vignettes/IRT_GRM.R` |
 | IRT: Multidimensional GPCM (5 dimensions) | 5 | No | `vignettes/IRT_MGPCM.Rmd` |
@@ -243,6 +245,9 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   # Each row represents one combination of latent variable values
   # For 2 latent variables with Ngrid = 9: nodes has 81 rows, 2 columns
   
+  # This data expansion enables efficient matrix-based computation,
+  # avoiding explicit loops and improving computational performance in STEP 3.
+
   # Expand x and y to match the quadrature grid dimensions
   x_i_extended_mat <- matrix(rep(x_i, times = Ngrid * Ngrid), 
                              nrow = Ngrid * Ngrid, byrow = TRUE)
