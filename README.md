@@ -16,7 +16,7 @@
 
 ## 🔍 Overview
 
-The `bleval` package provides tools for evaluating Bayesian latent variable models, such as structural equation models (SEMs), item response theory (IRT) models, and multilevel models (MLMs). 
+The `bleval` package provides tools for evaluating Bayesian latent variable models, such as structural equation models (SEMs), item response theory (IRT) models, and multilevel models (MLMs).
 
 It uses **adaptive Gauss-Hermite quadrature** to approximate marginal likelihoods by integrating out latent variables, supporting the computation of widely used Bayesian evaluation criteria, including:
 
@@ -75,16 +75,16 @@ The `bleval` package provides **a flexible framework** for Bayesian evaluation o
 
 | Model Category and Specification | Number of Latent Variables | Marginal Likelihood Tractability | Vignette File Name |
 |------------------|------------------|-------------------|------------------|
-| SEM: Confirmatory Factor Analysis (CFA) | 1 | Yes | `vignettes/SEM_CFA.R` |
-| SEM: Latent Variable Mediation | 3 | Yes | `vignettes/SEM_mediation.R` |
-| SEM: Latent Variable Moderation (with product terms) | 3 | No | `vignettes/SEM_moderation.Rmd` |
-| MLM: Gaussian Linear Mixed Model (random intercept + slope) | 2 | Yes | `vignettes/MLM_linear_mixed.Rmd` |
-| MLM: Location-Scale Model (random effects for both mean and variance) | 4 | No | `vignettes/MLM_location_scale.R` |
-| IRT: Unidimensional 2PL (binary responses) | 1 | No | `vignettes/IRT_2PL.R` |
-| IRT: Unidimensional GPCM (ordinal responses) | 1 | No | `vignettes/IRT_GPCM.R` |
-| IRT: Unidimensional GRM (ordinal responses) | 1 | No | `vignettes/IRT_GRM.R` |
-| IRT: Multidimensional GPCM (5 dimensions) | 5 | No | `vignettes/IRT_MGPCM.Rmd` |
-| IRT: Mixture Rasch Model | 2 | No | `vignettes/IRT_mixture_Rasch.Rmd` |
+| SEM: Confirmatory Factor Analysis (CFA) | 1 | Yes | `SEM_CFA.R` |
+| SEM: Latent Variable Mediation | 3 | Yes | `SEM_mediation.R` |
+| SEM: Latent Variable Moderation (with product terms) | 3 | No | `SEM_moderation.Rmd` |
+| MLM: Gaussian Linear Mixed Model (random intercept + slope) | 2 | Yes | `MLM_linear_mixed.Rmd` |
+| MLM: Location-Scale Model (random effects for both mean and variance) | 4 | No | `MLM_location_scale.R` |
+| IRT: Unidimensional 2PL (binary responses) | 1 | No | `IRT_2PL.R` |
+| IRT: Unidimensional GPCM (ordinal responses) | 1 | No | `IRT_GPCM.R` |
+| IRT: Unidimensional GRM (ordinal responses) | 1 | No | `IRT_GRM.R` |
+| IRT: Multidimensional GPCM (5 dimensions) | 5 | No | `IRT_MGPCM.Rmd` |
+| IRT: Mixture Rasch Model | 2 | No | `IRT_mixture_Rasch.Rmd` |
 
 Each vignette provides a complete workflow for model evaluation using the `bleval` package. Note that while some examples include data generation steps using simulated data, others begin with parameter estimation using empirical datasets. All examples demonstrate the full model evaluation pipeline including computation of information criteria (DIC, WAIC, LOOIC) and fully marginal likelihoods.
 
@@ -222,7 +222,6 @@ The `log_joint_i` function calculates the log joint density for each unit. This 
 -   **Map to Model Specification**: Write down your model mathematically first, then translate each component to code
 -   **Check Dimensions**: Ensure all matrices and vectors have compatible dimensions
 -   **Use Log-Scale**: Always work on log-scale for numerical stability
--   **Test with Simple Cases**: Verify your function works for a single posterior sample and unit
 
 ```{r}
 log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
@@ -371,7 +370,6 @@ The `log_prior` function calculates the log prior density for model parameters. 
 -   **One-to-One Translation**: Each prior in your JAGS/Stan model becomes one line in this function
 -   **Use the "\~" Heuristic**: Inspect your JAGS model and identify all lines with "\~" symbols. The log of the densities on the right-hand side of these "\~" symbols needs to be evaluated and summed. For `log_prior`, focus on the lines like:
     -   `parameter ~ prior_distribution(...)`
--   **Parameterization Check**: Ensure R density functions use the same parameterization as your Bayesian software
 -   **Use Log-Scale**: Remember to use log = TRUE in all density functions
 
 ```{r}
@@ -437,3 +435,17 @@ bleval::log_fmarglik(samples = samps2, data = data_list, Ngrid = 9,
 ```
 
 The output of this function is the log fully marginal likelihood, which can be used to compute Bayes factors for model comparison.
+
+#### 💡 Tips for Verifying Your Custom Functions
+
+Specifying the `log_joint_i` and `log_prior` functions correctly is crucial. Here are some strategies to help you verify your implementation:
+
+-   **Heuristic Check ("\~" Symbol)**: Inspect your JAGS/Stan model code. Every line with a "\~" symbol corresponds to a log-density that should be included in your custom functions.
+    -   Lines for observed variables and latent variables go into `log_joint_i`.
+    -   Lines for model parameters go into `log_prior`.
+
+-   **Parameterization Check**: Different software uses different parameterizations for distributions. For example, JAGS's dnorm uses mean and precision, while R's dnorm uses mean and standard deviation. Ensure your R functions use the correct parameters (e.g., sd = sqrt(1/precision)).
+
+-   **Test with a Single Sample**: Before running the full `bleval` analysis, test your `log_joint_i` and `log_prior` functions with a single set of parameter values from your posterior samples (`samples_s`) and a single unit (`i`). Check that the function runs without errors and returns a finite value.
+
+-   **Check the Effective Number of Parameters**: After computing the information criteria, look at the effective number of parameters (`p_dic`, `p_waic`, `p_loo`). While not exactly equal, this value should be a reasonable reflection of your model's complexity (i.e., the number of actual model parameters, not including latent variables). A value that is drastically different (e.g., orders of magnitude too large or small) may indicate a problem in your likelihood specification.
