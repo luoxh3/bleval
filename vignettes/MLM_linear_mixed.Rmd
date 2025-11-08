@@ -130,7 +130,7 @@ devtools::install_github("luoxh3/bleval")
 Then, we can load the package:
 
 ```{r}
-library(bleval, lib.loc = "D:/Software/R/R-4.2.2/library")
+library(bleval)
 ```
 
 ### Compute Information Criteria
