@@ -80,25 +80,33 @@ log_marglik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
       stop("'data' must contain an element named 'N' which indicates the number of units.")
     }
 
-    # Start parallel processing using the specified number of cores
-    cl <- makeCluster(n_cores)
-    registerDoParallel(cl)
+    if (.Platform$OS.type == "windows"){
+      # Start parallel processing using the specified number of cores
+      cl <- makeCluster(n_cores)
+      registerDoParallel(cl)
 
-    if (getDoParWorkers() == 0) {
-      stop("Parallel backend not registered properly. Please check.")
+      if (getDoParWorkers() == 0) {
+        stop("Parallel backend not registered properly. Please check.")
+      }
+
+      log_marglik_point <- foreach(j = 1:nrow(samples), .combine = rbind,
+                                  .packages = packages,
+                                  .export = c("get_quadrature", "log_marglik_i",
+                                              "data", "Ngrid", "lv_mu", "lv_cov",
+                                              "log_joint_i")) %dopar% {
+                                    sapply(1:data$N, function(i) {
+                                      bleval::log_marglik_i(samples[j, ], data, i, Ngrid,
+                                                            lv_mu, lv_cov, log_joint_i, ...)
+                                    })
+                                  }
+      stopCluster(cl)
+    } else {
+      log_marglik_point <- mclapply(1:nrow(samples),function(j) {
+        sapply(1:data$N, function(i) {
+          bleval::log_marglik_i(samples[j, ], data, i, Ngrid, lv_mu, lv_cov, log_joint_i, ...)
+        })
+      }, mc.cores = n_cores)
     }
-
-    log_marglik_point <- foreach(j = 1:nrow(samples), .combine = rbind,
-                                .packages = packages,
-                                .export = c("get_quadrature", "log_marglik_i",
-                                            "data", "Ngrid", "lv_mu", "lv_cov",
-                                            "log_joint_i")) %dopar% {
-                                  sapply(1:data$N, function(i) {
-                                    bleval::log_marglik_i(samples[j, ], data, i, Ngrid,
-                                                          lv_mu, lv_cov, log_joint_i, ...)
-                                  })
-                                }
-    stopCluster(cl)
 
   } else {
 
