@@ -28,7 +28,8 @@
 #'    - `nodes`: A matrix of quadrature nodes transformed using the latent variable mean and covariance.
 #' @param parallel A logical indicating whether to compute in parallel (default is TRUE).
 #' @param n_cores Number of cores to use for parallel computation. Defaults to `detectCores() - 2`.
-#' @param packages A character vector of package names to be loaded in the parallel environment.
+#' @param packages A character vector of additional package names to be loaded in the parallel environment.
+#' @param exports A character vector of additional function/object names to export to parallel workers.
 #' @param ... Additional arguments to the log_joint_i function.
 #'
 #' @return A list containing two elements:
@@ -54,10 +55,20 @@
 #'
 log_marglik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
                     parallel = TRUE, n_cores = detectCores() - 2,
-                    packages = c("matrixStats", "statmod", "mvtnorm", "extraDistr","truncdist"), ...) {
+                    packages = NULL, exports = NULL, ...) {
 
   ## log marginal likelihood for each point ------------------------------------
-
+  required_packages <- c("matrixStats", "statmod", "mvtnorm", "extraDistr", "truncdist")
+  if (!is.null(packages)) {
+    required_packages <- unique(c(required_packages, packages))
+  }
+  required_exports <- c("get_quadrature", "log_marglik_i",
+                        "data", "Ngrid", "lv_mu", "lv_cov",
+                        "log_joint_i")
+  if (!is.null(exports)) {
+    required_exports <- unique(c(required_exports, exports))
+  }
+  
   # Ensure that n_cores is positive and does not exceed the available cores
   if (parallel) {
     if (n_cores <= 0) {
@@ -90,10 +101,8 @@ log_marglik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
       }
 
       log_marglik_point <- foreach(j = 1:nrow(samples), .combine = rbind,
-                                  .packages = packages,
-                                  .export = c("get_quadrature", "log_marglik_i",
-                                              "data", "Ngrid", "lv_mu", "lv_cov",
-                                              "log_joint_i")) %dopar% {
+                                  .packages = required_packages,
+                                  .export = required_exports) %dopar% {
                                     sapply(1:data$N, function(i) {
                                       bleval::log_marglik_i(samples[j, ], data, i, Ngrid,
                                                             lv_mu, lv_cov, log_joint_i, ...)
@@ -101,6 +110,12 @@ log_marglik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
                                   }
       stopCluster(cl)
     } else {
+      missing_exports <- setdiff(required_exports, ls(envir = .GlobalEnv))
+      if (length(missing_exports) > 0) {
+        warning("The following functions/objects are not found in global environment and may cause errors: ",
+                paste(missing_exports, collapse = ", "))
+      }
+      
       log_marglik_list <- mclapply(1:nrow(samples), function(j) {
         sapply(1:data$N, function(i) {
           bleval::log_marglik_i(samples[j, ], data, i, Ngrid, lv_mu, lv_cov, log_joint_i, ...)
