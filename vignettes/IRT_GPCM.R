@@ -119,14 +119,14 @@ library(bleval)
 ## Step 1: Specify the log_joint_i function
 
 log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
-  # ==================================================
+  # =====================================================
   # STEP 1: Extract data and parameter draws needed
-  # ==================================================
+  # =====================================================
   N <- data$N       # Number of respondents
   J <- data$J       # Number of items
   K <- data$K       # Number of categories
   
-  # Extract observations for unit i
+  # Extract units for cluster i
   y <- data$y
   y_i <- as.matrix(y[i, ])
 
@@ -135,9 +135,9 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   b <- matrix(samples_s[grep("^b\\[\\d+,\\d+\\]$", names(samples_s))],
               nrow = J, ncol = K-1, byrow = TRUE)
   
-  # ==================================================
+  # =====================================================
   # STEP 2: Prepare data structures for quadrature
-  # ==================================================
+  # =====================================================
   # Dimensions of nodes: Ngrid^Ndim rows, Ndim columns (Ndim = number of latent variables)
   # Since the model contains only 1 latent variable, the 'nodes' is a column vector of quadrature points
   
@@ -148,9 +148,9 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   # This approach eliminates the need for pre-expanding data and parameters into Nnode x J matrices 
   # (e.g. y_i_extended_mat), and we instead process items sequentially for clarity.
   
-  # ==================================================
+  # =====================================================
   # STEP 3: Compute log conditional likelihood
-  # ==================================================
+  # =====================================================
   # This corresponds to: log p(y_j | η_j, θ)
   
   # For person i and item j, y_ij ~ Categorical(prob)
@@ -171,16 +171,16 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
     denominator <- rowSums(numerator)
     prob <- numerator/denominator
     
-    # Compute log-density for each observation at each quadrature point
+    # Compute log-density for each unit at each quadrature point
     log_con_i_j[,j] <- extraDistr::dcat(y_i[j], prob, log = TRUE)
   }
   
-  # Sum over observations within the unit (conditional independence)
+  # Sum over units within the cluster (conditional independence)
   log_con_i <- rowSums(log_con_i_j)
   
-  # ==================================================
+  # =====================================================
   # STEP 4: Compute log density for latent variables
-  # ==================================================
+  # =====================================================
   # This corresponds to: log p(η_j | θ)
   
   # In GPCM, we have a normal distribution for person i's latent trait: theta_i ~ N(0, 1)
@@ -188,9 +188,9 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   # Compute log normal density
   log_lv_i <- dnorm(nodes, mean = 0, sd = 1, log = TRUE)
   
-  # ==================================================
-  # STEP 5: Return the log joint density for each unit
-  # ==================================================
+  # =====================================================
+  # STEP 5: Return the log joint density for each cluster
+  # =====================================================
   # This equals: log p(y_j | η_j, θ) + log p(η_j | θ)
   log_con_i + log_lv_i
 }

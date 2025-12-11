@@ -185,9 +185,9 @@ library(bleval)
 ## Step 1: Specify the log_joint_i function
 
 log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
-  # ==================================================
+  # =====================================================
   # STEP 1: Extract data and parameter draws needed
-  # ==================================================
+  # =====================================================
   X_i <- data$X[i,]
   M_i <- data$M[i,]
   Y_i <- data$Y[i,]
@@ -217,9 +217,9 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   sd_eta_M <- sqrt(1/samples_s[["tau_eta_M"]])
   sd_eta_Y <- sqrt(1/samples_s[["tau_eta_Y"]])
   
-  # ==================================================
+  # =====================================================
   # STEP 2: Prepare data structures for quadrature
-  # ==================================================
+  # =====================================================
   # Dimensions of nodes: Ngrid^Ndim rows, Ndim columns (Ndim = number of latent variables)
   # Ndim = 3
   
@@ -231,12 +231,12 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   Y_i_extended_mat <- matrix(rep(Y_i, times = Ngrid^Ndim), 
                              nrow = Ngrid^Ndim, ncol = data$NumY, byrow = TRUE)
   
-  # ==================================================
+  # =====================================================
   # STEP 3: Compute log conditional likelihood
-  # ==================================================
+  # =====================================================
   # This corresponds to: log p(y_j | η_j, θ)
   
-  # Compute log-density for each observation at each quadrature point
+  # Compute log-density for each unit at each quadrature point
   log_con_X_ij <- dnorm(X_i_extended_mat, mean = nodes[,1] %*% t(lambda_X), 
                          sd = sd_X_mat, log = TRUE)
   log_con_M_ij <- dnorm(M_i_extended_mat, mean = nodes[,2] %*% t(lambda_M), 
@@ -244,12 +244,12 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   log_con_Y_ij <- dnorm(Y_i_extended_mat, mean = nodes[,3] %*% t(lambda_Y), 
                          sd = sd_Y_mat, log = TRUE)
   
-  # Sum over observations within the unit (conditional independence)
+  # Sum over units within the cluster (conditional independence)
   log_con_i <- rowSums(log_con_X_ij) + rowSums(log_con_M_ij) + rowSums(log_con_Y_ij)
   
-  # ==================================================
+  # =====================================================
   # STEP 4: Compute log density for latent variables
-  # ==================================================
+  # =====================================================
   # This corresponds to: log p(η_j | θ)
   predicted_M <- samples_s[["a"]] * nodes[,1] 
   predicted_Y <- samples_s[["c_prime"]] * nodes[,1] + samples_s[["b"]] * nodes[,2]
@@ -257,9 +257,9 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   log_eta_M_i <- dnorm(nodes[,2], mean = predicted_M, sd = sd_eta_M, log = TRUE)
   log_eta_Y_i <- dnorm(nodes[,3], mean = predicted_Y, sd = sd_eta_Y, log = TRUE)
   
-  # ==================================================
-  # STEP 5: Return the log joint density for each unit
-  # ==================================================
+  # =====================================================
+  # STEP 5: Return the log joint density for each cluster
+  # =====================================================
   # This equals: log p(y_j | η_j, θ) + log p(η_j | θ)
   log_con_i + (log_eta_X_i + log_eta_M_i + log_eta_Y_i)
 }

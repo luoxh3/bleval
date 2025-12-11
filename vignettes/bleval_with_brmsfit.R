@@ -102,7 +102,7 @@ build_Sigma_u_from_sample <- function(samples_s, meta) {
   D %*% R %*% D
 }
 
-#' Build the random-effects design matrix Z_i for unit i
+#' Build the random-effects design matrix Z_i for cluster i
 #'
 #' Purpose:
 #' - Create Z_i with columns matching meta$ranef_terms, using fit$data to map
@@ -112,15 +112,15 @@ build_Sigma_u_from_sample <- function(samples_s, meta) {
 #' - fit: brmsfit used only to access original data columns
 #' - meta: list from prepare_brms_meta(); provides ranef_terms (column order)
 #' - data: list with fields subject (indices), and covariates (e.g., x1, x2)
-#' - i: integer unit index in 1..N
+#' - i: integer cluster index in 1..N
 #'
 #' Outputs:
 #' - Numeric matrix Z_i of size T_i x K
 #'
 #' Processing:
 #' - For each term, if term == "Intercept" set column to 1; else copy the
-#'   corresponding column from fit$data restricted to observations of unit i.
-get_design_for_unit <- function(fit, meta, data, i) {
+#'   corresponding column from fit$data restricted to units of cluster i.
+get_design_for_cluster <- function(fit, meta, data, i) {
   idx_i <- which(data$subject == i)
   T_i <- length(idx_i)
   Zi <- matrix(NA_real_, nrow = T_i, ncol = meta$K)
@@ -406,7 +406,7 @@ default_bounds <- function(samps_mat, meta) {
 # Section 4. Joint density and prior in brms parameterization
 # =============================================================================
 
-#' Per-unit joint log-density for Gaussian models with random effects
+#' Per-cluster joint log-density for Gaussian models with random effects
 #'
 #' Purpose:
 #' - Evaluate log p(y_i | theta_i, sigma) + log p(theta_i | b, Sigma_u)
@@ -424,7 +424,7 @@ default_bounds <- function(samps_mat, meta) {
 log_joint_i <- function(samples_s, data, i, Ngrid, nodes, fit, meta, ...) {
   idx_i <- which(data$subject == i)
   y_i <- data$y[idx_i]
-  Zi <- get_design_for_unit(fit, meta, data, i)
+  Zi <- get_design_for_cluster(fit, meta, data, i)
 
   b_center <- numeric(meta$K)
   for (k in seq_len(meta$K)) {
@@ -437,7 +437,7 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes, fit, meta, ...) {
   if (!is_pos_def(Sigma_u)) return(rep(-Inf, nrow(nodes)))
   if (any(is.na(nodes)) || !is.numeric(nodes)) return(rep(-Inf, nrow(nodes)))
   
-  # Add fixed-effects contribution for observations of unit i
+  # Add fixed-effects contribution for units of cluster i
   fixed_part <- rep(0, nrow(Zi))
   b_names <- grep("^b_", names(samples_s), value = TRUE)
   if (length(b_names) > 0) {
@@ -559,7 +559,7 @@ log_prior <- function(samples_s, fit, meta, ...) {
   lp_total
 }
 
-#' Run bleval ICs and fully marginal likelihood from a brms fit
+#' Run bleval ICs and/or the log fully marginal likelihood from a brms fit
 #'
 #' Applicability:
 #' - Two-level models with a single grouping factor (one group variable).
@@ -585,18 +585,20 @@ log_prior <- function(samples_s, fit, meta, ...) {
 #'   - response column (e.g., y) and any covariates referenced by random-effect terms.
 #'   This is the same structure you used for bleval examples.
 #' @param Ngrid integer; number of quadrature nodes per dimension (default 3).
-#' @param parallel logical; whether to parallelize per-unit quadrature (default FALSE).
+#' @param parallel logical; whether to parallelize per-cluster quadrature (default FALSE).
 #' @param n_cores integer; cores for parallel execution (default 1).
 #' @param lb,ub optional named numeric vectors of lower/upper bounds for bridge sampling;
 #'   if NULL, sensible defaults are derived from the parameter names.
+#' @param output character; what results to compute: "all" (default), "ic" for marginal
+#'   likelihoods and information criteria only, or "lfml" for log fully marginal likelihood only.
 #' @return list with components:
-#'   - lm_res: result from bleval::log_marglik
-#'   - ic_res: result from bleval::calc_IC
-#'   - fml_res: result from bleval::log_fmarglik
+#'   - lml_res: result from bleval::log_marglik (only if output = "all" or "ic")
+#'   - ic_res: result from bleval::calc_IC (only if output = "all" or "ic")
+#'   - flml_res: result from bleval::log_fmarglik (only if output = "all" or "lfml")
 #'   - meta: metadata list (family, group, ranef terms, etc.)
 #'   - samples: posterior samples matrix used by bleval
 #'   - lv_mu, lv_cov: lists used for quadrature centers and covariances
-#'   - controls: list of settings used (Ngrid, parallel, n_cores)
+#'   - controls: list of settings used (Ngrid, parallel, n_cores, output)
 bleval_with_brmsfit <- function(
   fit,
   data,
@@ -604,8 +606,13 @@ bleval_with_brmsfit <- function(
   parallel = FALSE,
   n_cores = 1,
   lb = NULL,
-  ub = NULL
+  ub = NULL,
+  output = "all"
 ) {
+  if (!output %in% c("all", "ic", "lfml")) {
+    stop("Invalid output option: '", output, "'. Valid options are: 'all', 'ic', 'lfml'.")
+  }
+  
   # Family-link combination check
   fam <- family(fit)
   supported_combinations <- list(gaussian = "identity", bernoulli = "logit", poisson = "log")
@@ -626,53 +633,71 @@ bleval_with_brmsfit <- function(
   lv_cov <- lv_parts$lv_cov
   # Build posterior samples matrix
   samps_mat <- build_samples_matrix(fit, meta)
-  # Default bounds for bridge sampling
-  if (is.null(lb) || is.null(ub)) {
-    bnd <- default_bounds(samps_mat, meta)
-    if (is.null(lb)) lb <- bnd$lb
-    if (is.null(ub)) ub <- bnd$ub
-  }
+
   helper_exports_list <- helper_exports()
+  
+  result <- list()
+  
+  if (output %in% c("all", "ic")) {
   # Run bleval log marginal likelihood (integrated out latent variables)
-  lm_res <- bleval::log_marglik(
-    samples = samps_mat,
-    data = data,
-    Ngrid = Ngrid,
-    lv_mu = lv_mu,
-    lv_cov = lv_cov,
-    log_joint_i = log_joint_i,
-    parallel = parallel,
+    lml_res <- bleval::log_marglik(
+      samples = samps_mat,
+      data = data,
+      Ngrid = Ngrid,
+      lv_mu = lv_mu,
+      lv_cov = lv_cov,
+      log_joint_i = log_joint_i,
+      parallel = parallel,
+      n_cores = n_cores,
+      exports = helper_exports_list,
+      fit = fit,
+      meta = meta
+    )
+    # Information criteria
+    ic_res <- bleval::calc_IC(lml_res, p_dic_version = 1)
+    
+    result$lml_res <- lml_res
+    result$ic_res <- ic_res
+  }
+  
+  if (output %in% c("all", "lfml")) {
+    # Default bounds for bridge sampling
+    if (is.null(lb) || is.null(ub)) {
+      bnd <- default_bounds(samps_mat, meta)
+      if (is.null(lb)) lb <- bnd$lb
+      if (is.null(ub)) ub <- bnd$ub
+    }
+    
+    # Log fully marginal likelihood via bridge sampling
+    lfml_res <- bleval::log_fmarglik(
+      samples = samps_mat,
+      data = data,
+      Ngrid = Ngrid,
+      lv_mu = lv_mu,
+      lv_cov = lv_cov,
+      log_joint_i = log_joint_i,
+      log_prior = function(samples_s) log_prior(samples_s, fit = fit, meta = meta),
+      fit = fit,
+      meta = meta,
+      lb = lb,
+      ub = ub
+    )
+    
+    result$lfml_res <- lfml_res
+  }
+  
+  result$meta <- meta
+  result$samples <- samps_mat
+  result$lv_mu <- lv_mu
+  result$lv_cov <- lv_cov
+  result$controls <- list(
+    Ngrid = Ngrid, 
+    parallel = parallel, 
     n_cores = n_cores,
-    exports = helper_exports_list,
-    fit = fit,
-    meta = meta
+    output = output
   )
-  # Information criteria
-  ic_res <- bleval::calc_IC(lm_res, p_dic_version = 1)
-  # Fully marginal likelihood via bridge sampling
-  fml_res <- bleval::log_fmarglik(
-    samples = samps_mat,
-    data = data,
-    Ngrid = Ngrid,
-    lv_mu = lv_mu,
-    lv_cov = lv_cov,
-    log_joint_i = log_joint_i,
-    log_prior = function(samples_s) log_prior(samples_s, fit = fit, meta = meta),
-    fit = fit,
-    meta = meta,
-    lb = lb,
-    ub = ub
-  )
-  list(
-    lm_res = lm_res,
-    ic_res = ic_res,
-    fml_res = fml_res,
-    meta = meta,
-    samples = samps_mat,
-    lv_mu = lv_mu,
-    lv_cov = lv_cov,
-    controls = list(Ngrid = Ngrid, parallel = parallel, n_cores = n_cores)
-  )
+  
+  return(result)
 }
 
 #' Get list of helper functions for parallel export
@@ -680,7 +705,7 @@ bleval_with_brmsfit <- function(
 #' This function returns a character vector of all helper function names
 #' that need to be exported to parallel workers, with optional filtering.
 helper_exports <- function(){
-  c("prepare_brms_meta", "build_Sigma_u_from_sample", "get_design_for_unit",
+  c("prepare_brms_meta", "build_Sigma_u_from_sample", "get_design_for_cluster",
     "is_pos_def", "build_lv_from_fit", "build_samples_matrix", "default_bounds", 
     "loglik_cond_gaussian", "loglik_cond_bernoulli", "loglik_cond_poisson", 
     "parse_prior", "safe_bound", "find_prior_row", "log_dtrunc", "lkj_log_density", 
