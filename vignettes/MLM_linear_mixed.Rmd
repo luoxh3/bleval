@@ -24,7 +24,7 @@ library(MASS) # For multivariate normal distribution
 library(dplyr)
 
 set.seed(123)
-Nnum <- 500  # Number of level-2 units
+Nnum <- 500  # Number of level-2 clusters
 Tnum <- 50   # Number of level-1 units
 beta <- c(0, 0.3) # Fixed components of random intercept and slope
 rho <- 0.3   # Correlation between random intercept and slope
@@ -137,17 +137,17 @@ library(bleval)
 
 **Step 1: Specify the `log_joint_i` function**
 
-The `log_joint_i` function calculates the log joint density for each unit. This function takes the following inputs:
+The `log_joint_i` function calculates the log joint density for each cluster. This function takes the following inputs:
 
 -   `samples_s`: A named vector of parameter values from a posterior sample.
 -   `data`: A list containing the observed data.
--   `i`: The index of the unit.
+-   `i`: The index of the cluster.
 -   `Ngrid`: The number of quadrature nodes per latent variable.
 -   `nodes`: A matrix of latent variable values transformed from the quadrature nodes (output of the `get_quadrature` function).
 
 ```{r}
 log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
-  # Extract data for unit i
+  # Extract data for cluster i
   Nobs <- data$Nobs
   Nnum <- data$N
   Tnum <- Nobs / Nnum
@@ -160,7 +160,7 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   y_i_extended_mat <- matrix(rep(y_i, times = Ngrid * Ngrid), 
                              nrow = Ngrid * Ngrid, byrow = TRUE)
   
-  # Compute log conditional likelihood for each unit
+  # Compute log conditional likelihood for each cluster
   predicted_y <- nodes[, 1] + nodes[, 2] * x_i_extended_mat
   log_con_t_i <- dnorm(y_i_extended_mat, mean = predicted_y, 
                        sd = 1 / sqrt(samples_s[["y_pre"]]), log = TRUE)
@@ -174,7 +174,7 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
                     sd_mu * samples_s[["rho"]] * sd_phi, sd_phi^2), nrow = 2)
   log_raneff_i <- mvtnorm::dmvnorm(nodes, mean, sigma, log = TRUE)
   
-  # Return the log joint density for each unit
+  # Return the log joint density for each cluster
   log_raneff_i + log_con_i
 }
 ```
@@ -189,11 +189,11 @@ raneff_mu_list <- vector("list", Nnum)
 raneff_cov_list <- vector("list", Nnum)
 
 for (i in 1:Nnum) {
-  # Compute the posterior mean of the random intercept and slope for unit i
+  # Compute the posterior mean of the random intercept and slope for cluster i
   raneff_mu_list[[i]] <- c(
     mean(samps[, paste0("mu[", i, "]")]),
     mean(samps[, paste0("phi[", i, "]")]))
-  # Compute the posterior covariance matrix of the random intercept and slope for unit i
+  # Compute the posterior covariance matrix of the random intercept and slope for cluster i
   raneff_cov_list[[i]] <- cov(samps[, c(paste0("mu[", i, "]"), 
                                         paste0("phi[", i, "]"))])
 }
@@ -204,11 +204,11 @@ for (i in 1:Nnum) {
 The `log_marglik` function from the `bleval` package computes the log marginal likelihood by integrating out the latent variables using adaptive Gauss-Hermite quadrature. This function requires the following inputs:
 
 -   `samples`: A matrix or data frame containing the posterior samples of model parameters.
--   `data`: A list of data, including an element 'N' which indicates the number of units
+-   `data`: A list of data, including an element 'N' which indicates the number of clusters
 -   `Ngrid`: The number of quadrature nodes for each latent variable.
 -   `lv_mu`: A list of posterior means of the latent variables.
 -   `lv_cov`: A list of posterior covariance matrices of the latent variables.
--   `log_joint_i`: A user-defined function to compute the log joint density for each unit.
+-   `log_joint_i`: A user-defined function to compute the log joint density for each cluster.
 
 ```{r}
 log_marglik_result <- bleval::log_marglik(samples = samps2, data = data_list, Ngrid = 9,
@@ -275,11 +275,11 @@ names(ub) <- pars_vector # c("beta_0", "beta_1", "y_pre", "tau_beta_0", "tau_bet
 The `log_fmarglik` function from the `bleval` package computes the log fully marginal likelihood by integrating out both the latent variables and the model parameters. This function requires the following inputs:
 
 -   `samples`: A matrix or data frame containing the posterior samples of model parameters.
--   `data`: A list of data, including an element 'N' which indicates the number of units
+-   `data`: A list of data, including an element 'N' which indicates the number of clusters
 -   `Ngrid`: The number of quadrature nodes for each latent variable.
 -   `lv_mu`: A list of posterior means of the latent variables.
 -   `lv_cov`: A list of posterior covariance matrices of the latent variables.
--   `log_joint_i`: A user-defined function to compute the log joint density for each unit.
+-   `log_joint_i`: A user-defined function to compute the log joint density for each cluster.
 -   `log_prior`: A user-defined function to compute the log prior density for model parameters.
 -   `lb`: A named vector of lower bounds for the model parameters.
 -   `ub`: A named vector of upper bounds for the model parameters.

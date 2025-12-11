@@ -11,19 +11,19 @@
 #'
 #' @param samples A matrix or data frame of Bayesian posterior samples of model parameters.
 #'    Each row represents a sample, and each column represents a parameter.
-#' @param data A list of data, including an element 'N' which indicates the number of units.
+#' @param data A list of data, including an element 'N' which indicates the number of clusters.
 #' @param Ngrid Number of grid points (quadrature nodes) per dimension.
 #' @param lv_mu A list of posterior means for the latent variables.
 #'    Each element corresponds to the posterior mean of the latent variables
-#'    for a specific unit.
+#'    for a specific cluster.
 #' @param lv_cov A list of posterior covariance matrix for the latent variables.
 #'    Each element corresponds to the posterior covariance matrix of
-#'    the latent variables for a specific unit.
+#'    the latent variables for a specific cluster.
 #' @param log_joint_i A user-defined function that computes the log joint density
-#'    for a given unit. This function should take the following arguments:
+#'    for a given cluster. This function should take the following arguments:
 #'    - `samples_s`: A vector of parameter values from a posterior sample.
 #'    - `data`: The data list.
-#'    - `i`: The index of the unit.
+#'    - `i`: The index of the cluster.
 #'    - `Ngrid`: Number of grid points (quadrature nodes) per dimension.
 #'    - `nodes`: A matrix of quadrature nodes transformed using the latent variable mean and covariance.
 #' @param parallel A logical indicating whether to compute in parallel (default is TRUE).
@@ -34,9 +34,9 @@
 #'
 #' @return A list containing two elements:
 #'    \item{log_marglik_point}{A matrix of log marginal likelihoods for each data point.
-#'    Each row corresponds to a posterior sample, and each column corresponds to a unit.}
+#'    Each row corresponds to a posterior sample, and each column corresponds to a cluster.}
 #'    \item{log_marglik_postmean}{A vector of log marginal likelihoods computed using the posterior mean
-#'    of the parameters. Each element corresponds to a unit.}
+#'    of the parameters. Each element corresponds to a cluster.}
 #'
 #' @importFrom doParallel registerDoParallel
 #' @importFrom parallel makeCluster
@@ -88,7 +88,7 @@ log_marglik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
 
     # Validate that the data contains an element 'N'
     if (!"N" %in% names(data)) {
-      stop("'data' must contain an element named 'N' which indicates the number of units.")
+      stop("'data' must contain an element named 'N' which indicates the number of clusters.")
     }
 
     if (.Platform$OS.type == "windows"){

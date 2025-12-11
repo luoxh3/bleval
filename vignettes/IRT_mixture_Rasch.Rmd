@@ -31,7 +31,7 @@ data(example3_MixRasch, package = "bleval")
 
 D <- 1  # number of dimensions
 K <- 2  # number of latent classes
-I <- nrow(example3_MixRasch)  # number of respondents (i.e. units)
+I <- nrow(example3_MixRasch)  # number of respondents (i.e. clusters)
 J <- 7  # number of items
 
 res <- as.matrix(example3_MixRasch)
@@ -136,7 +136,7 @@ lv_draws <- as.matrix(draws[, grep("^theta", colnames(draws))])
 
 **Step 1: Specify the `log_joint_i` function**
 
-The `log_joint_i` function calculates the log joint density for each unit.
+The `log_joint_i` function calculates the log joint density for each cluster.
 
 ```{r}
 log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
@@ -183,12 +183,12 @@ for (i in 1:I){
   lv_list[[i]] <- lv_draws[ , ((i - 1)*D + 1):(i*D)]
 }
 
-# Compute the posterior mean of the latent ability for unit i
+# Compute the posterior mean of the latent ability for cluster i
 lv_mu_list <- lapply(lv_list, mean)
-# Compute the posterior variance of the latent ability for unit i
+# Compute the posterior variance of the latent ability for cluster i
 lv_cov_list <- lapply(lv_list, var)
 
-# Make sure that N denotes the number of units (i.e. respondents) in the data to be passed to the functions below
+# Make sure that N denotes the number of clusters (i.e. respondents) in the data to be passed to the functions below
 data_list$N <- data_list$I
 ```
 

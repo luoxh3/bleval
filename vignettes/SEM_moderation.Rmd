@@ -113,7 +113,7 @@ data_list <- list(
   X = example1_LMSEM[, 14:18],  # Observed indicators for latent variable X 
   M = example1_LMSEM[, 10:13],  # Observed indicators for latent variable M
   Y = example1_LMSEM[, 1:9],    # Observed indicators for latent variable Y
-  N = nrow(example1_LMSEM),     # Sample size (Number of units)
+  N = nrow(example1_LMSEM),     # Sample size (Number of clusters)
   NumX = 5,                     # Number of indicators for latent variable X
   NumM = 4,                     # Number of indicators for latent variable M
   NumY = 9                      # Number of indicators for latent variable Y
@@ -155,7 +155,7 @@ dim(samps2)
 
 **Step 1: Specify the `log_joint_i` function**
 
-The `log_joint_i` function calculates the log joint density for each unit.
+The `log_joint_i` function calculates the log joint density for each cluster.
 
 ```{r}
 log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
@@ -221,13 +221,13 @@ raneff_mu_list <- vector("list", Nnum)
 raneff_cov_list <- vector("list", Nnum)
 
 for (i in 1:Nnum) {
-  # Compute the posterior mean of the random intercept and slope for unit i
+  # Compute the posterior mean of the random intercept and slope for cluster i
   raneff_mu_list[[i]] <- c(
     mean(samps[, paste0("eta_X[", i, "]")]),
     mean(samps[, paste0("eta_M[", i, "]")]),
     mean(samps[, paste0("eta_Y[", i, "]")])
   )
-  # Compute the posterior covariance matrix of the random intercept and slope for unit i
+  # Compute the posterior covariance matrix of the random intercept and slope for cluster i
   raneff_cov_list[[i]] <- cov(samps[, c(paste0("eta_X[", i, "]"), 
                                         paste0("eta_M[", i, "]"), paste0("eta_Y[", i, "]"))])
 }

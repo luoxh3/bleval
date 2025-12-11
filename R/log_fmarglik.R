@@ -11,19 +11,19 @@
 #'
 #' @param samples A matrix or data frame of Bayesian posterior samples of model parameters.
 #'    Each row represents a sample, and each column represents a parameter.
-#' @param data A list of data, including an element 'N' which indicates the number of units.
+#' @param data A list of data, including an element 'N' which indicates the number of clusters.
 #' @param Ngrid Number of grid points (quadrature nodes) per dimension.
 #' @param lv_mu A list of posterior means for the latent variables.
 #'    Each element corresponds to the posterior mean of the latent variables
-#'    for a specific unit.
+#'    for a specific cluster.
 #' @param lv_cov A list of posterior covariance matrix for the latent variables.
 #'    Each element corresponds to the posterior covariance matrix of
-#'    the latent variables for a specific unit.
+#'    the latent variables for a specific cluster.
 #' @param log_joint_i A user-defined function that computes the log joint density
-#'    for a given unit. This function should take the following arguments:
+#'    for a given cluster. This function should take the following arguments:
 #'    - `samples_s`: A vector of parameter values from a posterior sample.
 #'    - `data`: The data list.
-#'    - `i`: The index of the unit.
+#'    - `i`: The index of the cluster.
 #'    - `Ngrid`: Number of grid points (quadrature nodes) per dimension.
 #'    - `nodes`: A matrix of quadrature nodes transformed using the latent variable mean and covariance.
 #' @param log_prior A user-defined function that computes the log prior density
@@ -70,7 +70,7 @@ log_fmarglik <- function(samples, data, Ngrid, lv_mu, lv_cov, log_joint_i,
     N <- data$N
     log_marglik_i_all <- numeric(N)
     for (i in 1:N) {
-      # Compute log marginal likelihood for each unit
+      # Compute log marginal likelihood for each cluster
       # passing lv_mu, lv_cov and Ngrid explicitly
       log_marglik_i_all[i] <- bleval::log_marglik_i(samples_s, data, i, Ngrid,
                                                     lv_mu, lv_cov, log_joint_i, ...)

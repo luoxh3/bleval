@@ -25,7 +25,7 @@ It uses **adaptive Gauss-Hermite quadrature** to approximate marginal likelihood
 -   **Leave-One-Out Information Criterion (LOOIC)**
 -   **Fully marginal likelihoods** for Bayes factor computation
 
-The package is particularly useful for researchers aiming to generalize their findings beyond observed units, as it emphasizes the importance of integrating out latent variables for predictive accuracy.
+The package is particularly useful for researchers aiming to generalize their findings beyond observed clusters, as it emphasizes the importance of integrating out latent variables for predictive accuracy.
 
 With step-by-step guidance, bleval facilitates the practical implementation of Bayesian model evaluation, making it accessible for applied researchers in psychology and related fields.
 
@@ -37,11 +37,11 @@ The workflow of the `bleval` package is illustrated in the figure below:
 
 ![**Workflow for using the bleval package.**](man/figures/workflow.jpg)
 
-*Notes*: The first two functions, located outside the dashed box, are used internally within the package to compute the marginal likelihood integrating out latent variables for each unit. The other three functions, highlighted within the dashed box, are user-facing functions designed for computing model evaluation measures.
+*Notes*: The first two functions, located outside the dashed box, are used internally within the package to compute the marginal likelihood integrating out latent variables for each cluster. The other three functions, highlighted within the dashed box, are user-facing functions designed for computing model evaluation measures.
 
 1.  **Generate quadrature nodes and weights**: The `get_quadrature` function generates quadrature nodes and weights for numerical integration.
-2.  **Compute log marginal likelihood**: The `log_marglik_i` function computes the log marginal likelihood for each unit by integrating out latent variables using adaptive Gauss-Hermite quadrature.
-3.  **Compute information criteria**: The `log_marglik` function computes the log marginal likelihood for all units, and the `calc_IC` function calculates DIC, WAIC, and LOOIC.
+2.  **Compute log marginal likelihood**: The `log_marglik_i` function computes the log marginal likelihood for each cluster by integrating out latent variables using adaptive Gauss-Hermite quadrature.
+3.  **Compute information criteria**: The `log_marglik` function computes the log marginal likelihood for all clusters, and the `calc_IC` function calculates DIC, WAIC, and LOOIC.
 4.  **Compute fully marginal likelihood**: The `log_fmarglik` function computes the log fully marginal likelihood by integrating out both latent variables and model parameters using bridge sampling.
 
 ------------------------------------------------------------------------
@@ -98,14 +98,14 @@ Note: For more detailed examples of using the `bleval` package with **multilevel
 
 ## 🎯 1 Data Generation
 
-We generate a dataset from a Gaussian linear mixed model with 500 level-2 units and 50 level-1 units per level-2 unit.
+We generate a dataset from a Gaussian linear mixed model with 500 level-2 clusters and 50 level-1 units per level-2 cluster.
 
 ``` r
 library(MASS)
 library(dplyr)
 
 set.seed(123)
-Nnum <- 500  # Number of level-2 units
+Nnum <- 500  # Number of level-2 clusters
 Tnum <- 50   # Number of level-1 units
 beta <- c(0, 0.3) # Fixed effects
 rho <- 0.3   # Correlation between random intercept and slope
@@ -202,18 +202,18 @@ Note: The `bleval` package provides a powerful and flexible framework for Bayesi
 
 ### 1️⃣ Step 1: Specify the `log_joint_i` function
 
-The `log_joint_i` function calculates the log joint density for each unit. This function takes the following inputs:
+The `log_joint_i` function calculates the log joint density for each cluster. This function takes the following inputs:
 
 -   `samples_s`: A named vector of parameter values from a posterior sample.
 -   `data`: A list containing the observed data.
--   `i`: The index of the unit.
+-   `i`: The index of the cluster.
 -   `Ngrid`: The number of quadrature nodes per latent variable.
 -   `nodes`: A matrix of latent variable values transformed from the quadrature nodes (output of the `get_quadrature` function).
 
 #### 💡 Tips for Writing `log_joint_i`
 
 -   **Understanding the components**:
-    -   Conditional likelihood p(y_j \| η_j, θ): the probability of observed data for unit j given latent variables and parameters
+    -   Conditional likelihood p(y_j \| η_j, θ): the probability of observed data for cluster j given latent variables and parameters
     -   Latent variable density p(η_j \| θ): the density of latent variables
     -   The function should return: log p(y_j \| η_j, θ) + log p(η_j \| θ)
 -   **Use the "\~" Heuristic**: Inspect your JAGS model and identify all lines with "\~" symbols. The log of the densities on the right-hand side of these "\~" symbols needs to be evaluated and summed. For `log_joint_i`, focus on the lines corresponding to:
@@ -226,16 +226,16 @@ The `log_joint_i` function calculates the log joint density for each unit. This 
 ```{r}
 log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   # ==================================================
-  # STEP 1: Extract data for the current unit i
+  # STEP 1: Extract data for the current cluster i
   # ==================================================
-  # In MLM context: i represents a level-2 unit (e.g., school, person)
+  # In MLM context: i represents a level-2 cluster (e.g., school, person)
   Nobs <- data$Nobs    # Total number of observations
-  Nnum <- data$N       # Number of level-2 units
-  Tnum <- Nobs / Nnum  # Number of the observations per unit
+  Nnum <- data$N       # Number of level-2 clusters
+  Tnum <- Nobs / Nnum  # Number of the units per cluster
   
-  # Extract observations for unit i
-  y_i <- data$y[((i-1)*Tnum+1):(i*Tnum)]  # Outcome values for unit i
-  x_i <- data$x[((i-1)*Tnum+1):(i*Tnum)]  # Predictor values for unit i
+  # Extract units for cluster i
+  y_i <- data$y[((i-1)*Tnum+1):(i*Tnum)]  # Outcome values for cluster i
+  x_i <- data$x[((i-1)*Tnum+1):(i*Tnum)]  # Predictor values for cluster i
   
   # ==================================================
   # STEP 2: Prepare data structures for quadrature
@@ -263,11 +263,11 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   # nodes[,1] = random intercept values, nodes[,2] = random slope values
   predicted_y <- nodes[, 1] + nodes[, 2] * x_i_extended_mat
   
-  # Compute log-density for each observation at each quadrature point
+  # Compute log-density for each unit at each quadrature point
   log_con_t_i <- dnorm(y_i_extended_mat, mean = predicted_y, 
                        sd = 1 / sqrt(samples_s[["y_pre"]]), log = TRUE)
   
-  # Sum over observations within the unit (conditional independence)
+  # Sum over units within the cluster (conditional independence)
   log_con_i <- rowSums(log_con_t_i)
   
   # ==================================================
@@ -289,7 +289,7 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   log_raneff_i <- mvtnorm::dmvnorm(nodes, mean, sigma, log = TRUE)
   
   # ==================================================
-  # STEP 5: Return the log joint density for each unit
+  # STEP 5: Return the log joint density for each cluster
   # ==================================================
   # This equals: log p(y_j | η_j, θ) + log p(η_j | θ)
   log_con_i + log_raneff_i
@@ -306,11 +306,11 @@ raneff_mu_list <- vector("list", Nnum)
 raneff_cov_list <- vector("list", Nnum)
 
 for (i in 1:Nnum) {
-  # Compute the posterior mean of the random intercept and slope for unit i
+  # Compute the posterior mean of the random intercept and slope for cluster i
   raneff_mu_list[[i]] <- c(
     mean(samps[, paste0("mu[", i, "]")]),
     mean(samps[, paste0("phi[", i, "]")]))
-  # Compute the posterior covariance matrix of the random intercept and slope for unit i
+  # Compute the posterior covariance matrix of the random intercept and slope for cluster i
   raneff_cov_list[[i]] <- cov(samps[, c(paste0("mu[", i, "]"), 
                                         paste0("phi[", i, "]"))])
 }
@@ -321,11 +321,11 @@ for (i in 1:Nnum) {
 The `log_marglik` function from the `bleval` package computes the log marginal likelihood by integrating out the latent variables using adaptive Gauss-Hermite quadrature. This function requires the following inputs:
 
 -   `samples`: A matrix or data frame containing the posterior samples of model parameters.
--   `data`: A list of data, including an element 'N' which indicates the number of units
+-   `data`: A list of data, including an element 'N' which indicates the number of clusters
 -   `Ngrid`: The number of quadrature nodes for each latent variable.
 -   `lv_mu`: A list of posterior means of the latent variables.
 -   `lv_cov`: A list of posterior covariance matrices of the latent variables.
--   `log_joint_i`: A user-defined function to compute the log joint density for each unit.
+-   `log_joint_i`: A user-defined function to compute the log joint density for each cluster.
 
 ```{r}
 log_marglik_result <- bleval::log_marglik(samples = samps2, data = data_list, Ngrid = 9,
@@ -418,11 +418,11 @@ names(ub) <- pars_vector # c("beta_0", "beta_1", "y_pre", "tau_beta_0", "tau_bet
 The `log_fmarglik` function from the `bleval` package computes the log fully marginal likelihood by integrating out both the latent variables and the model parameters. This function requires the following inputs:
 
 -   `samples`: A matrix or data frame containing the posterior samples of model parameters.
--   `data`: A list of data, including an element 'N' which indicates the number of units
+-   `data`: A list of data, including an element 'N' which indicates the number of clusters
 -   `Ngrid`: The number of quadrature nodes for each latent variable.
 -   `lv_mu`: A list of posterior means of the latent variables.
 -   `lv_cov`: A list of posterior covariance matrices of the latent variables.
--   `log_joint_i`: A user-defined function to compute the log joint density for each unit.
+-   `log_joint_i`: A user-defined function to compute the log joint density for each cluster.
 -   `log_prior`: A user-defined function to compute the log prior density for model parameters.
 -   `lb`: A named vector of lower bounds for the model parameters.
 -   `ub`: A named vector of upper bounds for the model parameters.
@@ -446,6 +446,6 @@ Specifying the `log_joint_i` and `log_prior` functions correctly is crucial. Her
 
 -   **Parameterization Check**: Different software uses different parameterizations for distributions. For example, JAGS's dnorm uses mean and precision, while R's dnorm uses mean and standard deviation. Ensure your R functions use the correct parameters (e.g., sd = sqrt(1/precision)).
 
--   **Test with a Single Sample**: Before running the full `bleval` analysis, test your `log_joint_i` and `log_prior` functions with a single set of parameter values from your posterior samples (`samples_s`) and a single unit (`i`). Check that the function runs without errors and returns a finite value.
+-   **Test with a Single Sample**: Before running the full `bleval` analysis, test your `log_joint_i` and `log_prior` functions with a single set of parameter values from your posterior samples (`samples_s`) and a single cluster (`i`). Check that the function runs without errors and returns a finite value.
 
 -   **Check the Effective Number of Parameters**: After computing the information criteria, look at the effective number of parameters (`p_dic`, `p_waic`, `p_loo`). While not exactly equal, this value should be a reasonable reflection of your model's complexity (i.e., the number of actual model parameters, not including latent variables). A value that is drastically different (e.g., orders of magnitude too large or small) may indicate a problem in your likelihood specification.

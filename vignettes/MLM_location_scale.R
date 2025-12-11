@@ -18,7 +18,7 @@ library(dplyr)
 set.seed(123)
 
 # Model parameters
-Nnum <- 200  # Number of level-2 units (e.g., individuals)
+Nnum <- 200  # Number of level-2 clusters (e.g., individuals)
 Tnum <- 50   # Number of level-1 units (e.g., time points)
 
 # Location parameters (mean structure)
@@ -189,15 +189,15 @@ library(bleval)
 
 log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   # ==================================================
-  # STEP 1: Extract data for the current unit i
+  # STEP 1: Extract data for the current cluster i
   # ==================================================
   Nobs <- data$Nobs    # Total number of observations
-  Nnum <- data$N       # Number of level-2 units
-  Tnum <- Nobs / Nnum  # Number of observations per unit
+  Nnum <- data$N       # Number of level-2 clusters
+  Tnum <- Nobs / Nnum  # Number of units per cluster
 
-  # Extract observations for unit i
-  y_i <- data$y[((i-1)*Tnum+1):(i*Tnum)]  # Outcome values for unit i
-  x_i <- data$x[((i-1)*Tnum+1):(i*Tnum)]  # Predictor values for unit i
+  # Extract units for cluster i
+  y_i <- data$y[((i-1)*Tnum+1):(i*Tnum)]  # Outcome values for cluster i
+  x_i <- data$x[((i-1)*Tnum+1):(i*Tnum)]  # Predictor values for cluster i
 
   # ==================================================
   # STEP 2: Prepare data structures for quadrature
@@ -230,11 +230,11 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   predicted_mean <- mu_location + phi_location * x_i_extended_mat
   predicted_var <- exp(alpha_scale + beta_scale * x_i_extended_mat)
 
-  # Compute log-density for each observation at each quadrature point
+  # Compute log-density for each unit at each quadrature point
   log_con_t_i <- dnorm(y_i_extended_mat, mean = predicted_mean,
                        sd = sqrt(predicted_var), log = TRUE)
 
-  # Sum over observations within the unit (conditional independence)
+  # Sum over units within the cluster (conditional independence)
   log_con_i <- rowSums(log_con_t_i)
 
   # ==================================================
@@ -281,14 +281,14 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   log_raneff_i <- log_location_prior + log_scale_prior
 
   # ==================================================
-  # STEP 5: Return the log joint density for each unit
+  # STEP 5: Return the log joint density for each cluster
   # ==================================================
   # This equals: log p(y_j | η_j, θ) + log p(η_j | θ)
   log_con_i + log_raneff_i
 }
 
 ## Step 2: Compute the posterior means and covariance matrices of latent variables
-# We have 4 latent variables per unit: mu_location, phi_location, alpha_scale, beta_scale
+# We have 4 latent variables per cluster: mu_location, phi_location, alpha_scale, beta_scale
 raneff_mu_list <- vector("list", Nnum)
 raneff_cov_list <- vector("list", Nnum)
 

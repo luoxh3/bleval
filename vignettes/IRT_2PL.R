@@ -88,13 +88,13 @@ library(bleval)
 ## Step 1: Specify the log_joint_i function
 
 log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
-  # ==================================================
+  # =====================================================
   # STEP 1: Extract data and parameter draws needed
-  # ==================================================
+  # =====================================================
   N <- data$N       # Number of respondents
   J <- data$J       # Number of items
   
-  # Extract observations for unit i
+  # Extract units for cluster i
   y <- data$y
   y_i <- as.matrix(y[i, ])
 
@@ -102,9 +102,9 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   a <- as.vector(samples_s[grep("^a\\[\\d+\\]$", names(samples_s))])
   b <- as.vector(samples_s[grep("^b\\[\\d+\\]$", names(samples_s))])
   
-  # ==================================================
+  # =====================================================
   # STEP 2: Prepare data structures for quadrature
-  # ==================================================
+  # =====================================================
   # Dimensions of nodes: Ngrid^Ndim rows, Ndim columns (Ndim = number of latent variables)
   # Since the model contains only 1 latent variable, the 'nodes' is a column vector of quadrature points
   
@@ -119,31 +119,31 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   theta_i_extended_mat <- matrix(rep(nodes, each = J),
                                  nrow = Ngrid^1, ncol = J, byrow = TRUE)
   
-  # ==================================================
+  # =====================================================
   # STEP 3: Compute log conditional likelihood
-  # ==================================================
+  # =====================================================
   # This corresponds to: log p(y_j | η_j, θ)
   # In 2-PL model, for person i and item j, y_ij ~ Bernoulli(a_j*(theta_i - b_j))
   
-  # Compute log-density for each observation at each quadrature point
+  # Compute log-density for each unit at each quadrature point
   p <- plogis(a_extended_mat * (theta_i_extended_mat - b_extended_mat))
   log_con_i_j <- dbinom(y_i_extended_mat, 1, p, log = TRUE)
   
-  # Sum over observations within the unit (conditional independence)
+  # Sum over units within the cluster (conditional independence)
   log_con_i <- rowSums(log_con_i_j)
   
-  # ==================================================
+  # =====================================================
   # STEP 4: Compute log density for latent variables
-  # ==================================================
+  # =====================================================
   # This corresponds to: log p(η_j | θ)
   # In 2-PL, we have a normal distribution for person i's latent ability: theta_i ~ N(0, 1)
   
   # Compute log normal density
   log_lv_i <- dnorm(nodes, mean = 0, sd = 1, log = TRUE)
   
-  # ==================================================
-  # STEP 5: Return the log joint density for each unit
-  # ==================================================
+  # =====================================================
+  # STEP 5: Return the log joint density for each cluster
+  # =====================================================
   # This equals: log p(y_j | η_j, θ) + log p(η_j | θ)
   log_con_i + log_lv_i
 }

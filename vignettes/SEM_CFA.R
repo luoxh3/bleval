@@ -111,7 +111,7 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   N <- data$N       # Number of respondents
   J <- data$J       # Number of items
   
-  # Extract observations for unit i
+  # Extract units for cluster i
   y <- data$y
   y_i <- as.matrix(y[i, ])
 
@@ -138,11 +138,11 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   # This corresponds to: log p(y_j | η_j, θ)
   # In CFA model, for person i and item j, y_ij ~ N(lambda_j * eta_i, theta_j)
   
-  # Compute log-density for each observation at each quadrature point
+  # Compute log-density for each unit at each quadrature point
   log_con_i_j <- dnorm(y_i_extended_mat, mean = nodes%*%t(lambda), 
                        sd = sqrt(rep(1/tau_theta, each = total_nodes)), log = TRUE)
   
-  # Sum over observations within the unit (conditional independence)
+  # Sum over units within the cluster (conditional independence)
   log_con_i <- rowSums(log_con_i_j)
   
   # ==================================================
@@ -155,7 +155,7 @@ log_joint_i <- function(samples_s, data, i, Ngrid, nodes) {
   log_lv_i <- dnorm(nodes, mean = 0, sd = sqrt(1/tau_psi), log = TRUE)
   
   # ==================================================
-  # STEP 5: Return the log joint density for each unit
+  # STEP 5: Return the log joint density for each cluster
   # ==================================================
   # This equals: log p(y_j | η_j, θ) + log p(η_j | θ)
   log_con_i + log_lv_i
