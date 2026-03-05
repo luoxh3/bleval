@@ -50,8 +50,7 @@ The workflow of the `bleval` package is illustrated in the figure below:
 
 If you use the `bleval` package in your research, please cite it as follows:
 
-Luo, X., Dong, J., Liu, H., & Liu, Y. (in preparation). Bayesian Model Evaluation for Latent Variable Models: A Tutorial on Computing Information Criteria and Bayes Factors with the R Package *bleval*. *Journal*, *XX*(X), XXX-XXX.\
-DOI: [...]
+Luo, X., Dong, J., Liu, H., Liu, Y., & Merkle, E. C. (in revision). Bayesian Evaluation for Latent Variable Models: A Tutorial on Computing Information Criteria and Bayes Factors with the R Package bleval. *Psychological Methods*.
 
 ------------------------------------------------------------------------
 
